@@ -1,0 +1,11 @@
+product_category_name,warehouse_location,avg_unit_cost,current_stock,reorder_level
+cama_mesa_banho,SP-Warehouse-1,45.50,1200,300
+beleza_saude,RJ-Warehouse-1,25.00,850,200
+esporte_lazer,SP-Warehouse-2,60.00,600,150
+moveis_decoracao,MG-Warehouse-1,85.20,400,100
+informatica_acessorios,SP-Warehouse-1,120.00,950,250
+utilidades_domesticas,RJ-Warehouse-1,35.00,1100,200
+relogios_presentes,SP-Warehouse-2,105.00,300,50
+telefonia,MG-Warehouse-1,75.00,800,150
+automotivo,SP-Warehouse-1,55.50,450,100
+brinquedos,RJ-Warehouse-1,30.00,700,200

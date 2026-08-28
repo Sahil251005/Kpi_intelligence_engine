@@ -1,0 +1,5 @@
+event_date,event_name,event_type,impact_multiplier
+2017-11-24,Black Friday,Promotion,2.50
+2017-12-25,Christmas,Holiday,1.50
+2018-01-01,New Year,Holiday,0.80
+2018-05-21,Truckers Strike,Supply Chain Disruption,0.40
