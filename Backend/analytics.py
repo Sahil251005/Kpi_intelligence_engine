@@ -378,13 +378,18 @@ def build_evidence(top_case, analysis, z_scores, hybrid):
     }
 
     return evidence
-def calculate_hypothesis_confidence(hypothesis, evidence,nlp_result):
+def calculate_hypothesis_confidence(hypothesis, evidence, nlp_result):
     """
-    Calculate evidence-based confidence for an LLM-generated
-    hypothesis.
+    Calculate confidence for an LLM-generated hypothesis.
 
-    The LLM generates the hypothesis.
-    Python independently evaluates the available evidence.
+    LLM:
+        Generates the hypothesis.
+
+    NLP:
+        Identifies what the hypothesis is claiming.
+
+    Python:
+        Evaluates only the evidence relevant to that claim.
     """
 
     if hypothesis is None or evidence is None or nlp_result is None:
@@ -393,258 +398,193 @@ def calculate_hypothesis_confidence(hypothesis, evidence,nlp_result):
     revenue = evidence["revenue_evidence"]
     inventory = evidence["inventory_evidence"]
     cross_signal = evidence["cross_signal_evidence"]
-    business = evidence["business_evidence"]
 
-    hypothesis_type = hypothesis.type.lower()
-    statement = hypothesis.statement.lower()
-
-    relationship = nlp_result["relationship"]
-    causal_claim = nlp_result["causal_claim"]
-    certainty = nlp_result["certainty"]
-    signals = nlp_result["signals"]
+    claim_type = nlp_result["claim_type"]
 
     supporting_score = 0
     weakening_score = 0
     evidence_breakdown = []
 
-    # ==================================================
-    # INVENTORY-RELATED HYPOTHESIS
-    # ==================================================
+    # --------------------------------------------------
+    # 1. SIGNAL RELATIONSHIP
+    # --------------------------------------------------
 
-    inventory_related = (
-        "inventory" in hypothesis_type
-        or "stock" in hypothesis_type
-        or "inventory" in statement
-        or "stock" in statement
-    )
+    if claim_type == "SIGNAL_RELATIONSHIP":
 
-    revenue_impact = (
-        "revenue" in hypothesis_type
-        or "revenue" in statement
-        or "sales" in statement
-    )
-
-    # ==================================================
-    # 1. INVENTORY + REVENUE HYPOTHESIS
-    # ==================================================
-
-    if inventory_related and revenue_impact:
-
-        # Extreme inventory anomaly
-        if inventory["statistical_status"] == "EXTREME":
-
-            supporting_score += 3
-
-            evidence_breakdown.append(
-                (
-                    "Inventory statistical status is EXTREME",
-                    +3
-                )
-            )
-
-        # Severe inventory decline
-        if inventory["stock_change_pct"] <= -30:
-
-            supporting_score += 2
-
-            evidence_breakdown.append(
-                (
-                    "Inventory declined by more than 30%",
-                    +2
-                )
-            )
-
-        # Revenue below expected
-        if revenue["revenue_deviation_pct"] < 0:
-
-            supporting_score += 1
-
-            evidence_breakdown.append(
-                (
-                    "Revenue is below expected",
-                    +1
-                )
-            )
-
-        # Same-period relationship
-        if cross_signal["same_case_period"]:
-
-            supporting_score += 2
-
-            evidence_breakdown.append(
-                (
-                    "Revenue and inventory changes "
-                    "occurred in the same period",
-                    +2
-                )
-            )
-
-        # But causation is not established
-        weakening_score += 2
-
-        evidence_breakdown.append(
-            (
-                "Evidence does not establish that "
-                "inventory caused the revenue decline",
-                -2
-            )
-        )
-
-        # Revenue is statistically normal
-        if revenue["statistical_status"] == "NORMAL":
-
-            weakening_score += 1
-
-            evidence_breakdown.append(
-                (
-                    "Revenue deviation is statistically NORMAL",
-                    -1
-                )
-            )
-
-    # ==================================================
-    # 2. STATISTICAL HYPOTHESIS
-    # ==================================================
-
-    elif (
-        "statistical" in hypothesis_type
-        or "statistical" in statement
-        or "normal" in hypothesis_type
-        or "normal" in statement
-        or "anomaly" in hypothesis_type
-        or "anomaly" in statement
-    ):
-
-        # Revenue normal
-        if revenue["statistical_status"] == "NORMAL":
-
-            supporting_score += 3
-
-            evidence_breakdown.append(
-                (
-                    "Revenue deviation is statistically NORMAL",
-                    +3
-                )
-            )
-
-        # Inventory extreme
-        if inventory["statistical_status"] == "EXTREME":
-
-            supporting_score += 3
-
-            evidence_breakdown.append(
-                (
-                    "Inventory deviation is statistically EXTREME",
-                    +3
-                )
-            )
-
-        # Different statistical severity
+        # Both signals must actually exist
         if (
-            revenue["statistical_status"]
-            != inventory["statistical_status"]
+            "revenue" in nlp_result["signals"]
+            and "inventory" in nlp_result["signals"]
         ):
 
-            supporting_score += 2
-
-            evidence_breakdown.append(
-                (
-                    "Revenue and inventory have different "
-                    "statistical severity",
-                    +2
+            if cross_signal["revenue_declined"]:
+                supporting_score += 1
+                evidence_breakdown.append(
+                    ("Revenue declined", +1)
                 )
-            )
 
-        # Inventory dominant
-        if cross_signal["dominant_signal"] == "INVENTORY":
-
-            supporting_score += 2
-
-            evidence_breakdown.append(
-                (
-                    "Inventory is the dominant signal",
-                    +2
+            if cross_signal["inventory_declined"]:
+                supporting_score += 1
+                evidence_breakdown.append(
+                    ("Inventory declined", +1)
                 )
+
+            if cross_signal["same_case_period"]:
+                supporting_score += 2
+                evidence_breakdown.append(
+                    ("Revenue and inventory changes occurred in the same period", +2)
+                )
+
+            # Extreme inventory anomaly strengthens
+            # an inventory-related relationship
+            if inventory["statistical_status"] == "EXTREME":
+                supporting_score += 2
+                evidence_breakdown.append(
+                    ("Inventory movement is statistically EXTREME", +2)
+                )
+
+            # Revenue being statistically normal weakens
+            # the idea that revenue itself is an extreme anomaly
+            if revenue["statistical_status"] == "NORMAL":
+                weakening_score += 1
+                evidence_breakdown.append(
+                    ("Revenue deviation is statistically NORMAL", -1)
+                )
+
+            # Important:
+            # correlation / potential impact does NOT prove causation
+            if nlp_result["relationship"] in (
+                "correlation",
+                "potential_impact"
+            ):
+                weakening_score += 2
+                evidence_breakdown.append(
+                    ("Evidence does not establish causation", -2)
+                )
+
+    # --------------------------------------------------
+    # 2. STATISTICAL INTERPRETATION
+    # --------------------------------------------------
+
+    elif claim_type == "STATISTICAL_INTERPRETATION":
+
+        # Revenue-specific statistical claim
+        if "revenue" in nlp_result["signals"]:
+
+            if revenue["statistical_status"] == "NORMAL":
+                supporting_score += 4
+                evidence_breakdown.append(
+                    ("Revenue deviation is statistically NORMAL", +4)
+                )
+
+            elif revenue["statistical_status"] == "EXTREME":
+                supporting_score += 4
+                evidence_breakdown.append(
+                    ("Revenue deviation is statistically EXTREME", +4)
+                )
+
+            # Use the actual revenue z-score
+            if abs(revenue["z_score"]) < 2:
+                supporting_score += 2
+                evidence_breakdown.append(
+                    ("Revenue z-score is within normal range", +2)
+                )
+            else:
+                weakening_score += 2
+                evidence_breakdown.append(
+                    ("Revenue z-score indicates unusual behavior", -2)
+                )
+
+        # Inventory-specific statistical claim
+        if "inventory" in nlp_result["signals"]:
+
+            if inventory["statistical_status"] == "EXTREME":
+                supporting_score += 4
+                evidence_breakdown.append(
+                    ("Inventory deviation is statistically EXTREME", +4)
+                )
+
+            elif inventory["statistical_status"] == "NORMAL":
+                supporting_score += 4
+                evidence_breakdown.append(
+                    ("Inventory deviation is statistically NORMAL", +4)
+                )
+
+    # --------------------------------------------------
+    # 3. PRIORITY / ALERT CLAIM
+    # --------------------------------------------------
+
+    elif claim_type == "PRIORITY_INTERPRETATION":
+
+        business = evidence["business_evidence"]
+
+        if business["priority_level"] == "HIGH":
+            supporting_score += 3
+            evidence_breakdown.append(
+                ("Case has HIGH business priority", +3)
             )
-
-    # ==================================================
-    # 3. PURE INVENTORY HYPOTHESIS
-    # ==================================================
-
-    elif inventory_related:
 
         if inventory["statistical_status"] == "EXTREME":
-
-            supporting_score += 3
-
+            supporting_score += 2
             evidence_breakdown.append(
-                (
-                    "Inventory statistical status is EXTREME",
-                    +3
-                )
+                ("Inventory anomaly is statistically EXTREME", +2)
+            )
+
+        if cross_signal["dominant_signal"] == "INVENTORY":
+            supporting_score += 2
+            evidence_breakdown.append(
+                ("Inventory is the dominant signal", +2)
+            )
+
+    # --------------------------------------------------
+    # 4. INVENTORY CLAIM
+    # --------------------------------------------------
+
+    elif claim_type == "INVENTORY_INTERPRETATION":
+
+        if inventory["statistical_status"] == "EXTREME":
+            supporting_score += 4
+            evidence_breakdown.append(
+                ("Inventory deviation is statistically EXTREME", +4)
             )
 
         if inventory["stock_change_pct"] <= -30:
-
-            supporting_score += 2
-
+            supporting_score += 3
             evidence_breakdown.append(
-                (
-                    "Inventory declined by more than 30%",
-                    +2
-                )
+                ("Inventory declined by more than 30%", +3)
             )
 
         if cross_signal["dominant_signal"] == "INVENTORY":
-
             supporting_score += 2
-
             evidence_breakdown.append(
-                (
-                    "Inventory is the dominant signal",
-                    +2
-                )
+                ("Inventory is the dominant signal", +2)
             )
 
-    # ==================================================
-    # 4. UNKNOWN / UNSUPPORTED HYPOTHESIS
-    # ==================================================
+        if not inventory["below_reorder"]:
+            weakening_score += 1
+            evidence_breakdown.append(
+                ("Stock remains above reorder level", -1)
+            )
+
+    # --------------------------------------------------
+    # 5. GENERIC / UNKNOWN CLAIM
+    # --------------------------------------------------
 
     else:
 
-        # We don't have a deterministic mapping for this
-        # type of hypothesis.
-
-        supporting_score += 1
-
+        # Don't pretend unrelated evidence supports
+        # an unknown claim.
         evidence_breakdown.append(
-            (
-                "Some case evidence is available",
-                +1
-            )
+            ("Claim type not recognized; insufficient claim-specific evidence", 0)
         )
 
-        weakening_score += 2
-
-        evidence_breakdown.append(
-            (
-                "Hypothesis cannot be directly evaluated "
-                "from the structured evidence",
-                -2
-            )
-        )
-
-    # ==================================================
+    # --------------------------------------------------
     # FINAL CONFIDENCE
-    # ==================================================
+    # --------------------------------------------------
 
-    total_score = (
-        supporting_score +
-        weakening_score
-    )
+    total_score = supporting_score + weakening_score
 
     if total_score == 0:
-
         return {
             "confidence_score": 0,
             "confidence_level": "INSUFFICIENT",
@@ -653,27 +593,17 @@ def calculate_hypothesis_confidence(hypothesis, evidence,nlp_result):
             "evidence_breakdown": evidence_breakdown
         }
 
-    confidence_score = (
-        supporting_score / total_score
-    )
+    confidence_score = supporting_score / total_score
 
     if confidence_score >= 0.75:
-
         confidence_level = "HIGH"
-
     elif confidence_score >= 0.50:
-
         confidence_level = "MEDIUM"
-
     else:
-
         confidence_level = "LOW"
 
     return {
-        "confidence_score": round(
-            confidence_score,
-            2
-        ),
+        "confidence_score": round(confidence_score, 2),
         "confidence_level": confidence_level,
         "supporting_score": supporting_score,
         "weakening_score": weakening_score,

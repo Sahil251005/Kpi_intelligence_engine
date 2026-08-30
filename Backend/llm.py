@@ -121,3 +121,128 @@ many speculative hypotheses.
     result = response.choices[0].message.content
 
     return HypothesisResponse.model_validate_json(result)
+def generate_business_summary(
+    case,
+    evidence,
+    hypothesis,
+    nlp_result,
+    confidence,
+    recommendation
+):
+    """
+    Generate a business-facing explanation from the
+    completed analytical pipeline.
+
+    The LLM is only responsible for communicating
+    the results clearly. It must not invent evidence,
+    change confidence, or claim unsupported causation.
+    """
+
+    prompt = f"""
+You are a business intelligence analyst.
+
+Create a concise business-facing investigation summary
+using ONLY the information provided below.
+
+Do not invent facts.
+Do not introduce new causes.
+Do not change the confidence level.
+Do not claim causation unless causal_claim is explicitly True.
+
+CASE
+----
+Month: {case['month']}
+Region: {case['region']}
+Category: {case['product_category_name']}
+Priority: {case['priority_score']}
+Priority Level: {case['priority_level']}
+
+EVIDENCE
+--------
+{evidence}
+
+HYPOTHESIS
+----------
+Type: {hypothesis.type}
+Statement: {hypothesis.statement}
+Evidence Basis: {hypothesis.evidence_basis}
+Unknowns: {hypothesis.unknowns}
+
+NLP INTERPRETATION
+------------------
+Signals: {nlp_result['signals']}
+Claim Type: {nlp_result['claim_type']}
+Relationship: {nlp_result['relationship']}
+Direction: {nlp_result['direction']}
+Causal Claim: {nlp_result['causal_claim']}
+Certainty: {nlp_result['certainty']}
+Uncertainty Detected: {nlp_result['uncertainty_detected']}
+
+CONFIDENCE
+----------
+Score: {confidence['confidence_score']}
+Level: {confidence['confidence_level']}
+Supporting Score: {confidence['supporting_score']}
+Weakening Score: {confidence['weakening_score']}
+
+RECOMMENDATION
+--------------
+Action: {recommendation['action']}
+Urgency: {recommendation['urgency']}
+Priority: {recommendation['priority']}
+Next Steps: {recommendation['next_steps']}
+Confidence Note: {recommendation['confidence_note']}
+Causal Warning: {recommendation['causal_warning']}
+
+Write the response using exactly these sections:
+
+1. Executive Summary
+2. Key Evidence
+3. Investigation Hypothesis
+4. Confidence
+5. Recommended Action
+6. Important Caveat
+
+Keep the response concise and business-oriented.
+
+The final response must clearly distinguish:
+- observed facts
+- possible explanations
+- recommended actions
+
+Do not introduce explanations that are not explicitly
+present in the supplied hypothesis or evidence.
+
+For example, do not say inventory "limited sales capacity"
+unless that exact conclusion is supported by the supplied
+evidence.
+
+Prefer:
+"The inventory decline may have contributed to the
+revenue shortfall."
+
+Do not add operational mechanisms that were not provided.
+
+Do not present a hypothesis as a confirmed fact.
+"""
+
+    response = client.chat.completions.create(
+        model="openai/gpt-oss-20b",
+        messages=[
+            {
+                "role": "system",
+                "content": (
+                    "You are a careful business intelligence "
+                    "analyst. Use only the supplied evidence."
+                )
+            },
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ],
+        temperature=0.2,
+        max_tokens=700
+    )
+
+    return response.choices[0].message.content

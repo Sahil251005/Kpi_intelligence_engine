@@ -6,8 +6,8 @@ def analyze_hypothesis_language(hypothesis):
     Interpret the language of an LLM-generated hypothesis.
 
     This function does NOT decide whether the hypothesis is true.
-    It only extracts linguistic characteristics that can later
-    be used by the confidence layer.
+    It identifies what the hypothesis is claiming so that the
+    confidence layer can evaluate the relevant evidence.
     """
 
     if hypothesis is None:
@@ -43,7 +43,65 @@ def analyze_hypothesis_language(hypothesis):
         signals.append("revenue")
 
     # --------------------------------------------------
-    # 2. Detect relationship
+    # 2. Detect uncertainty / hedging
+    # --------------------------------------------------
+
+    uncertainty_terms = [
+        "may",
+        "might",
+        "could",
+        "possibly",
+        "possible",
+        "appears",
+        "appear",
+        "suggests",
+        "suggest",
+        "potential",
+        "potentially",
+        "likely",
+        "unlikely"
+    ]
+
+    uncertainty_detected = any(
+        re.search(
+            rf"\b{re.escape(term)}\b",
+            statement
+        )
+        for term in uncertainty_terms
+    )
+
+    if uncertainty_detected:
+        certainty = "moderate"
+    else:
+        certainty = "high"
+
+    # --------------------------------------------------
+    # 3. Detect investigation / conditional language
+    # --------------------------------------------------
+
+    investigation_terms = [
+        "determine if",
+        "determine whether",
+        "investigate whether",
+        "investigate if",
+        "assess whether",
+        "assess if",
+        "evaluate whether",
+        "evaluate if",
+        "check whether",
+        "check if",
+        "test whether",
+        "test if",
+        "whether"
+    ]
+
+    investigation_language = any(
+        term in statement
+        for term in investigation_terms
+    )
+
+    # --------------------------------------------------
+    # 4. Detect causal language
     # --------------------------------------------------
 
     causal_terms = [
@@ -59,6 +117,56 @@ def analyze_hypothesis_language(hypothesis):
         "responsible for"
     ]
 
+    causal_language_detected = any(
+        term in statement
+        for term in causal_terms
+    )
+
+    # --------------------------------------------------
+    # 4a. Detect negated / uncertain causal language
+    # --------------------------------------------------
+
+    non_causal_patterns = [
+        "may not be due to",
+        "might not be due to",
+        "could not be due to",
+        "may not be caused by",
+        "might not be caused by",
+        "could not be caused by",
+        "not caused by",
+        "not due to",
+        "unlikely to be caused by",
+        "unlikely to be due to"
+    ]
+
+    non_causal_language = any(
+        phrase in statement
+        for phrase in non_causal_patterns
+    )
+
+    # A causal word does not automatically mean
+    # the hypothesis is making a causal claim.
+    #
+    # Example:
+    # "Inventory caused revenue decline."
+    # -> causal claim
+    #
+    # "Determine whether inventory caused revenue decline."
+    # -> investigation, not causal claim
+    #
+    # "Revenue may not be due to inventory issues."
+    # -> negated/uncertain, not causal claim
+
+    causal_claim = (
+        causal_language_detected
+        and not investigation_language
+        and not non_causal_language
+    )
+
+    # --------------------------------------------------
+    # 5. Detect potential-impact relationship
+    # --------------------------------------------------
+
     impact_terms = [
         "contributing",
         "contribute",
@@ -71,8 +179,22 @@ def analyze_hypothesis_language(hypothesis):
         "influence",
         "limiting",
         "constrain",
-        "constraining"
+        "constraining",
+        "may affect",
+        "may impact",
+        "likely contributed",
+        "could contribute",
+        "might contribute"
     ]
+
+    impact_relationship = any(
+        term in statement
+        for term in impact_terms
+    )
+
+    # --------------------------------------------------
+    # 6. Detect correlation / association
+    # --------------------------------------------------
 
     correlation_terms = [
         "coincides",
@@ -80,28 +202,48 @@ def analyze_hypothesis_language(hypothesis):
         "associated",
         "association",
         "relationship",
-        "related",
+        "related to",
+        "linked to",
         "correlated",
         "correlation",
         "simultaneous",
-        "concurrent",
         "together"
     ]
-
-    causal_claim = any(
-        term in statement
-        for term in causal_terms
-    )
-
-    impact_relationship = any(
-        term in statement
-        for term in impact_terms
-    )
 
     correlation_relationship = any(
         term in statement
         for term in correlation_terms
     )
+
+    # --------------------------------------------------
+    # 7. Detect statistical interpretation
+    # --------------------------------------------------
+
+    statistical_terms = [
+        "statistically",
+        "statistical",
+        "z-score",
+        "z score",
+        "normal statistical range",
+        "normal range",
+        "statistical range",
+        "statistical variation",
+        "statistical status",
+        "extreme anomaly",
+        "statistically extreme",
+        "statistically normal",
+        "normal variation",
+        "anomaly"
+    ]
+
+    statistical_interpretation = any(
+        term in statement
+        for term in statistical_terms
+    )
+
+    # --------------------------------------------------
+    # 8. Determine relationship
+    # --------------------------------------------------
 
     if causal_claim:
         relationship = "causal"
@@ -116,76 +258,43 @@ def analyze_hypothesis_language(hypothesis):
         relationship = "descriptive"
 
     # --------------------------------------------------
-    # 3. Identify claim type
+    # 9. Determine claim type
+    # --------------------------------------------------
+    #
+    # Relationship claims are checked first only when
+    # the sentence is actually relationship-focused.
+    #
+    # Statistical interpretation gets priority when
+    # the sentence explicitly focuses on statistical
+    # behavior.
     # --------------------------------------------------
 
-    priority_terms = [
-        "priority",
-        "priority score",
-        "priority level",
-        "high priority",
-        "low priority",
-        "medium priority"
-    ]
+    relationship_focused = (
+        len(signals) >= 2
+        and (
+            impact_relationship
+            or correlation_relationship
+            or causal_claim
+        )
+    )
 
-    threshold_terms = [
-        "reorder threshold",
-        "reorder level",
-        "threshold",
-        "stock-out",
-        "stockout",
-        "stock out",
-        "below reorder",
-        "above reorder"
-    ]
-
-    statistical_terms = [
-        "statistical",
-        "statistically",
-        "z-score",
-        "z score",
-        "normal variation",
-        "normal range",
-        "normal statistical",
-        "extreme",
-        "anomaly"
-    ]
-
-    if any(
-        term in statement
-        for term in priority_terms
-    ):
-        claim_type = "PRIORITY_EXPLANATION"
-
-    elif any(
-        term in statement
-        for term in threshold_terms
-    ):
-        claim_type = "THRESHOLD_INTERPRETATION"
-
-    elif any(
-        term in statement
-        for term in statistical_terms
-    ):
-        claim_type = "STATISTICAL_INTERPRETATION"
-
-    elif (
-        "inventory" in signals
-        and "revenue" in signals
-    ):
+    if relationship_focused and not statistical_interpretation:
         claim_type = "SIGNAL_RELATIONSHIP"
 
+    elif statistical_interpretation:
+        claim_type = "STATISTICAL_INTERPRETATION"
+
     elif "inventory" in signals:
-        claim_type = "INVENTORY_BEHAVIOR"
+        claim_type = "INVENTORY_INTERPRETATION"
 
     elif "revenue" in signals:
-        claim_type = "REVENUE_BEHAVIOR"
+        claim_type = "REVENUE_INTERPRETATION"
 
     else:
-        claim_type = "GENERAL"
+        claim_type = "OTHER"
 
     # --------------------------------------------------
-    # 4. Detect direction
+    # 10. Detect direction
     # --------------------------------------------------
 
     negative_terms = [
@@ -202,7 +311,9 @@ def analyze_hypothesis_language(hypothesis):
         "reduction",
         "reduced",
         "lower",
-        "below"
+        "below",
+        "depletion",
+        "depleted"
     ]
 
     positive_terms = [
@@ -240,49 +351,16 @@ def analyze_hypothesis_language(hypothesis):
         direction = "neutral"
 
     # --------------------------------------------------
-    # 5. Detect uncertainty / hedging
-    # --------------------------------------------------
-
-    uncertainty_terms = [
-        "may",
-        "might",
-        "could",
-        "possibly",
-        "possible",
-        "appears",
-        "appear",
-        "suggests",
-        "suggest",
-        "potential",
-        "potentially",
-        "likely",
-        "unlikely"
-    ]
-
-    uncertainty_detected = any(
-        re.search(
-            rf"\b{re.escape(term)}\b",
-            statement
-        )
-        for term in uncertainty_terms
-    )
-
-    if uncertainty_detected:
-        certainty = "moderate"
-    else:
-        certainty = "high"
-
-    # --------------------------------------------------
-    # 6. Detect unsupported causal language
+    # 11. Detect unsupported causal language
     # --------------------------------------------------
 
     unsupported_causal_claim = (
         causal_claim
-        and len(signals) > 0
+        and len(signals) >= 2
     )
 
     # --------------------------------------------------
-    # 7. Return structured interpretation
+    # 12. Return structured interpretation
     # --------------------------------------------------
 
     return {
