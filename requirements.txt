@@ -1,5 +1,5 @@
 pandas
 psycopg2-binary
 python-dotenv
-sqpalchemy
+SQLAlchemy
 pydantic
