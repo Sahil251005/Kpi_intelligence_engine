@@ -137,7 +137,9 @@ def generate_business_summary(
     the results clearly. It must not invent evidence,
     change confidence, or claim unsupported causation.
     """
-
+    inventory = evidence["inventory_evidence"]
+    revenue = evidence["revenue_evidence"]
+    
     prompt = f"""
 You are a business intelligence analyst.
 
@@ -149,6 +151,20 @@ Do not introduce new causes.
 Do not change the confidence level.
 Do not claim causation unless causal_claim is explicitly True.
 
+IMPORTANT:
+Use numerical values exactly as provided.
+Do not infer relationships between numbers yourself.
+
+For inventory:
+- If current_stock is greater than reorder_level,
+  state that inventory is ABOVE the reorder level.
+- If current_stock is less than reorder_level,
+  state that inventory is BELOW the reorder level.
+- Never describe inventory as below the reorder level
+  when the supplied evidence says below_reorder is False.
+
+Do not contradict the supplied evidence or recommendation.
+
 CASE
 ----
 Month: {case['month']}
@@ -159,7 +175,9 @@ Priority Level: {case['priority_level']}
 
 EVIDENCE
 --------
-{evidence}
+Current stock: {inventory['current_stock']}
+Reorder level: {inventory['reorder_level']}
+Below reorder level: {inventory['below_reorder']}
 
 HYPOTHESIS
 ----------
@@ -242,7 +260,7 @@ Do not present a hypothesis as a confirmed fact.
             }
         ],
         temperature=0.2,
-        max_tokens=700
+        max_tokens=1000
     )
 
     return response.choices[0].message.content

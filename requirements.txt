@@ -3,3 +3,6 @@ psycopg2-binary
 python-dotenv
 SQLAlchemy
 pydantic
+groq
+fastapi
+uvicorn

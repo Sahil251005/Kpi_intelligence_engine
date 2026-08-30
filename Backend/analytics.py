@@ -1,6 +1,6 @@
 import pandas as pd
 
-from database import get_engine
+from Backend.database import get_engine
 
 
 def get_investigation_queue():
