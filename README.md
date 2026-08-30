@@ -279,23 +279,5 @@ It looks for:
 
 This analysis does **not** decide whether a hypothesis is true. Instead, it extracts these characteristics so they can be considered by the confidence-scoring logic.
 
-#### How the Backend Components Work Together
-
-The backend follows this flow:
-
-**PostgreSQL Investigation Queue**
-↓
-**`database.py` — Connect to PostgreSQL**
-↓
-**`analytics.py` — Historical & statistical analysis**
-↓
-**Evidence Package**
-↓
-**`llm.py` — Generate hypotheses**
-↓
-**`nlp.py` — Analyze hypothesis language**
-↓
-**`analytics.py` — Calculate evidence-based confidence**
-
 Together, these components turn a prioritized KPI case into a structured investigation with **evidence, possible explanations, and confidence scores**.
 
