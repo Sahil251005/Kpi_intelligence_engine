@@ -117,6 +117,7 @@ The data is loaded into **PostgreSQL**, where the main business tables are combi
 
 The database also maintains investigation-specific data, including the **analytics investigation queue and investigation history**, which are used by the backend when analyzing and comparing investigation cases.
 
+## Technology Stacks
 
 ### PostgreSQL & SQL
 
