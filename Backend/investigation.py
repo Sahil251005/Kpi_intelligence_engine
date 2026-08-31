@@ -189,6 +189,8 @@ def run_investigation():
     return {
         "case": top_case,
 
+        "history": history.to_dict(orient="records"),
+
         "analysis": analysis,
 
         "z_scores": z_scores,

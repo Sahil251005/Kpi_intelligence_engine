@@ -1,8 +1,9 @@
 import os
 from pathlib import Path
 
-from sqlalchemy import create_engine
 from dotenv import load_dotenv
+from sqlalchemy import create_engine
+from sqlalchemy.engine import URL
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -12,13 +13,13 @@ load_dotenv(BASE_DIR / ".env")
 def get_engine():
     """Create and return a SQLAlchemy PostgreSQL engine."""
 
-    database_url = (
-        f"postgresql+psycopg2://"
-        f"{os.getenv('DB_USER')}:"
-        f"{os.getenv('DB_PASSWORD')}@"
-        f"{os.getenv('DB_HOST')}:"
-        f"{os.getenv('DB_PORT')}/"
-        f"{os.getenv('DB_NAME')}"
+    database_url = URL.create(
+        drivername="postgresql+psycopg2",
+        username=os.getenv("DB_USER"),
+        password=os.getenv("DB_PASSWORD"),
+        host=os.getenv("DB_HOST"),
+        port=int(os.getenv("DB_PORT", "5432")),
+        database=os.getenv("DB_NAME"),
     )
 
     return create_engine(database_url)
