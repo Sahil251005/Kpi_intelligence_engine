@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 
 from Backend.investigation import run_investigation
 
@@ -9,6 +10,16 @@ app = FastAPI(
     version="1.0.0"
 )
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://localhost:5174",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.get("/")
 def root():
@@ -47,6 +58,29 @@ def investigation():
                 "category": case["product_category_name"],
                 "warehouse": case["warehouse_location"]
             },
+
+            "history": [
+                {
+                    "month": str(row["month"]),
+                    "region": row["region"],
+                    "product_category_name": row["product_category_name"],
+                    "revenue": float(row["revenue"]),
+                    "expected_revenue": float(row["expected_revenue"]),
+                    "revenue_deviation_pct": float(
+                        row["revenue_deviation_pct"]
+                    ),
+                    "current_stock": int(row["current_stock"]),
+                    "reorder_level": int(row["reorder_level"]),
+                    "stock_change_pct": float(
+                        row["stock_change_pct"]
+                    ),
+                    "inventory_status": row["inventory_status"],
+                    "business_signal": row["business_signal"],
+                    "priority_score": int(row["priority_score"]),
+                    "priority_level": row["priority_level"],
+                }
+                for row in result["history"]
+            ],
 
             "priority": {
                 "score": case["priority_score"],
