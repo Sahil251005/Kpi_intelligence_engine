@@ -723,7 +723,7 @@ The response is consumed directly by the React frontend.
   "recommendation": {},
   "business_summary": {}
 }
-
+```
 ---
 
 #Team
