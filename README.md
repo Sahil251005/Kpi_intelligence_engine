@@ -726,8 +726,6 @@ The response is consumed directly by the React frontend.
 ```
 ---
 
-#Team
-
 ### Team Commit & Conquer
 
 * [Kanishka Sakunia](https://github.com/kanishka5268)
