@@ -1297,7 +1297,8 @@ function App() {
                 </div>
 
                 <span className="normal">
-                  {Math.abs(key_metrics.revenue.z_score) >= 2
+                  {key_metrics.revenue.z_score !== null &&
+                  Math.abs(key_metrics.revenue.z_score) >= 2
                     ? "ANOMALOUS"
                     : "NORMAL"}
                 </span>

@@ -483,9 +483,9 @@ def calculate_hypothesis_confidence(hypothesis, evidence, nlp_result):
     weakening_score = 0
     evidence_breakdown = []
 
-    # --------------------------------------------------
+    # ------------------------------------------------
     # 1. SIGNAL RELATIONSHIP
-    # --------------------------------------------------
+    # ------------------------------------------------
 
     if claim_type == "SIGNAL_RELATIONSHIP":
 

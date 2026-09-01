@@ -37,7 +37,7 @@ def investigation(scenario: str = "priority"):
 
         elif scenario == "limited":
             result = run_investigation(scenario="limited")
-            
+
         else:
             result = run_investigation()
 
