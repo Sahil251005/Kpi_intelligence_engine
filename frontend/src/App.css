@@ -237,6 +237,198 @@ main {
   font-size: 13px;
 }
 
+/* ---------------- INVESTIGATION OUTCOME ---------------- */
+
+.investigation-outcome {
+  margin: 45px 0 80px;
+
+  padding: 30px;
+
+  border: 1px solid #292e37;
+  border-radius: 14px;
+
+  background:
+    linear-gradient(
+      145deg,
+      #12151b,
+      #0f1117
+    );
+}
+
+.investigation-outcome-header {
+  padding-bottom: 24px;
+
+  border-bottom: 1px solid #252a33;
+}
+
+.investigation-outcome-header h2 {
+  max-width: 760px;
+
+  margin: 10px 0 0;
+
+  color: #e6e8ec;
+
+  font-size: 24px;
+  line-height: 1.35;
+
+  letter-spacing: -0.025em;
+}
+
+
+/* Outcome columns */
+
+.outcome-grid {
+  display: grid;
+
+  grid-template-columns:
+    1fr 1fr 1fr;
+
+  gap: 0;
+
+  margin-top: 0;
+}
+
+.outcome-block {
+  min-height: 190px;
+
+  padding: 25px 28px 22px 0;
+
+  border-right: 1px solid #252a33;
+}
+
+.outcome-block:nth-child(2) {
+  padding-left: 28px;
+}
+
+.outcome-block:nth-child(3) {
+  padding-left: 28px;
+
+  border-right: none;
+}
+
+
+/* Labels */
+
+.outcome-label {
+  display: block;
+
+  color: #69717e;
+
+  font-size: 8px;
+  font-weight: 800;
+
+  letter-spacing: 0.11em;
+}
+
+
+/* Headings */
+
+.outcome-block h3 {
+  max-width: 300px;
+
+  margin: 14px 0 0;
+
+  color: #dfe2e7;
+
+  font-size: 17px;
+  line-height: 1.45;
+
+  letter-spacing: -0.015em;
+}
+
+
+/* Supporting text */
+
+.outcome-block p {
+  max-width: 310px;
+
+  margin: 12px 0 0;
+
+  color: #858d9a;
+
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+
+/* Metrics */
+
+.outcome-metrics {
+  display: flex;
+
+  gap: 35px;
+
+  margin-top: 24px;
+}
+
+.outcome-metrics div {
+  display: flex;
+
+  flex-direction: column;
+
+  gap: 5px;
+}
+
+.outcome-metrics strong {
+  color: #e1e4e9;
+
+  font-size: 21px;
+  font-weight: 700;
+
+  letter-spacing: -0.025em;
+}
+
+.outcome-metrics span {
+  color: #68707d;
+
+  font-size: 8px;
+}
+
+
+/* Action block */
+
+.outcome-action h3 {
+  color: #e5e7eb;
+}
+
+
+/* Caveat */
+
+.outcome-caveat {
+  display: flex;
+
+  align-items: flex-start;
+
+  gap: 14px;
+
+  margin-top: 5px;
+  padding: 15px 16px;
+
+  border-top: 1px solid #252a33;
+
+  background: #151820;
+}
+
+.outcome-caveat span {
+  padding-top: 2px;
+
+  color: #747c88;
+
+  font-size: 8px;
+  font-weight: 800;
+
+  letter-spacing: 0.1em;
+}
+
+.outcome-caveat p {
+  margin: 0;
+
+  color: #7f8794;
+
+  font-size: 10px;
+  line-height: 1.5;
+}
+
 /* Investigation context */
 
 .investigation-context {
@@ -1211,64 +1403,6 @@ main {
 }
 
 
-/* Recommendation context */
-
-.recommendation-context {
-  display: grid;
-  grid-template-columns:
-    repeat(4, 1fr);
-
-  gap: 1px;
-
-  margin-top: 30px;
-
-  overflow: hidden;
-
-  border: 1px solid #282d35;
-  border-radius: 10px;
-
-  background: #282d35;
-}
-
-.context-item {
-  min-height: 105px;
-
-  padding: 19px;
-
-  background: #12151b;
-}
-
-.context-item span {
-  display: block;
-
-  color: #737985;
-
-  font-size: 8px;
-  font-weight: 800;
-
-  letter-spacing: 0.11em;
-}
-
-.context-item strong {
-  display: block;
-
-  margin-top: 11px;
-
-  font-size: 21px;
-  letter-spacing: -0.02em;
-}
-
-.context-item small {
-  display: block;
-
-  margin-top: 4px;
-
-  color: #666d79;
-
-  font-size: 9px;
-}
-
-
 /* Recommendation body */
 
 .recommendation-body {
@@ -1894,10 +2028,6 @@ main {
   }
 
   .next-steps {
-    grid-template-columns: 1fr;
-  }
-
-  .recommendation-context {
     grid-template-columns: 1fr;
   }
 

@@ -615,6 +615,126 @@ function App() {
 
         </section>
 
+        {/* INVESTIGATION OUTCOME */}
+
+        <section className="investigation-outcome">
+
+          <div className="investigation-outcome-header">
+
+            <div>
+              <span className="eyebrow">
+                INVESTIGATION OUTCOME
+              </span>
+
+              <h2>
+                What is happening, why it matters, and what should happen next?
+              </h2>
+            </div>
+
+          </div>
+
+
+          <div className="outcome-grid">
+
+            {/* WHAT HAPPENED */}
+
+            <div className="outcome-block">
+
+              <span className="outcome-label">
+                01 · WHAT HAPPENED
+              </span>
+
+              <h3>
+                Revenue and inventory declined together.
+              </h3>
+
+              <div className="outcome-metrics">
+
+                <div>
+                  <strong>
+                    {key_metrics.revenue.deviation_pct.toFixed(2)}%
+                  </strong>
+
+                  <span>
+                    Revenue deviation
+                  </span>
+                </div>
+
+                <div>
+                  <strong>
+                    {key_metrics.inventory.stock_change_pct.toFixed(2)}%
+                  </strong>
+
+                  <span>
+                    Inventory movement
+                  </span>
+                </div>
+
+              </div>
+
+            </div>
+
+
+            {/* WHY IT MATTERS */}
+
+            <div className="outcome-block">
+
+              <span className="outcome-label">
+                02 · WHY IT MATTERS
+              </span>
+
+              <h3>
+                Inventory is the dominant business signal.
+              </h3>
+
+              <p>
+                Inventory movement is statistically extreme relative
+                to historical behavior, making inventory depletion the
+                primary signal requiring investigation.
+              </p>
+
+            </div>
+
+
+            {/* WHAT TO DO */}
+
+            <div className="outcome-block outcome-action">
+
+              <span className="outcome-label">
+                03 · WHAT TO DO
+              </span>
+
+              <h3>
+                Investigate inventory depletion and replenishment activity.
+              </h3>
+
+              <p>
+                Review inventory movement records, replenishment timing
+                and quantities, and whether the observed stock reduction
+                was expected.
+              </p>
+
+            </div>
+
+          </div>
+
+
+          {/* CAUSALITY NOTE */}
+
+          <div className="outcome-caveat">
+
+            <span>IMPORTANT</span>
+
+            <p>
+              The evidence supports investigation of the inventory signal,
+              but does not establish that inventory changes caused the
+              revenue decline.
+            </p>
+
+          </div>
+
+        </section>
+
 
         {/* INVESTIGATION FLOW */}
 
@@ -1270,11 +1390,12 @@ function App() {
               </span>
 
               <h2>
-                What should happen next?
+                Validate the inventory signal
               </h2>
 
               <p className="recommendation-lead">
-                {investigation.recommendation.action}
+                Before attributing revenue impact to inventory changes,
+                validate the operational evidence behind the signal.
               </p>
             </div>
 
@@ -1283,65 +1404,6 @@ function App() {
             </div>
 
           </div>
-
-
-          <div className="recommendation-context">
-
-            <div className="context-item">
-              <span>PRIORITY</span>
-
-              <strong>
-                {investigation.recommendation.priority}
-              </strong>
-
-              <small>
-                Score {investigation.recommendation.priority_score}
-              </small>
-            </div>
-
-
-            <div className="context-item">
-              <span>CONFIDENCE</span>
-
-              <strong>
-                {Math.round(
-                  investigation.recommendation.confidence.score * 100
-                )}%
-              </strong>
-
-              <small>
-                {investigation.recommendation.confidence.level}
-              </small>
-            </div>
-
-
-            <div className="context-item">
-              <span>SIGNAL STRENGTH</span>
-
-              <strong>
-                {investigation.recommendation.signal_strength}
-              </strong>
-
-              <small>
-                Investigation strength
-              </small>
-            </div>
-
-
-            <div className="context-item">
-              <span>DOMINANT SIGNAL</span>
-
-              <strong>
-                {investigation.signals.dominant_signal}
-              </strong>
-
-              <small>
-                Primary investigation focus
-              </small>
-            </div>
-
-          </div>
-
 
           <div className="recommendation-body">
 
@@ -1381,20 +1443,26 @@ function App() {
 
               <div className="next-step-list">
 
-                {investigation.recommendation.next_steps.map(
-                  (step, index) => (
-                    <div
-                      className="next-step"
-                      key={index}
-                    >
-                      <span>
-                        {String(index + 1).padStart(2, "0")}
-                      </span>
+                <div className="next-step">
+                  <span>01</span>
+                  <p>Review inventory movement records.</p>
+                </div>
 
-                      <p>{step}</p>
-                    </div>
-                  )
-                )}
+                <div className="next-step">
+                  <span>02</span>
+                  <p>
+                    Compare replenishment timing and quantities
+                    against expected patterns.
+                  </p>
+                </div>
+
+                <div className="next-step">
+                  <span>03</span>
+                  <p>
+                    Check whether the observed stock reduction
+                    was operationally expected.
+                  </p>
+                </div>
 
               </div>
 
@@ -1452,7 +1520,7 @@ function App() {
 
             <p>
               A concise business interpretation of the
-              evidence, hypothesis, confidence and recommended action.
+              evidence, hypothesis and recommended action.
             </p>
           </div>
 
@@ -1552,51 +1620,9 @@ function App() {
           </div>
 
 
-          {/* 04 — CONFIDENCE */}
-          <div className="summary-section">
-            <span className="summary-index">04</span>
-
-            <div>
-              <span className="eyebrow">
-                CONFIDENCE
-              </span>
-
-              <div className="summary-confidence">
-
-                <div className="confidence-score">
-                  <strong>
-                    {Math.round(confidence.score * 100)}%
-                  </strong>
-
-                  <span>
-                    {confidence.level}
-                  </span>
-                </div>
-
-                <div className="confidence-details">
-                  <div>
-                    <span>SUPPORTING</span>
-                    <strong>
-                      {confidence.supporting_score}
-                    </strong>
-                  </div>
-
-                  <div>
-                    <span>WEAKENING</span>
-                    <strong>
-                      {confidence.weakening_score}
-                    </strong>
-                  </div>
-                </div>
-
-              </div>
-            </div>
-          </div>
-
-
-          {/* 05 — RECOMMENDED ACTION */}
+          {/* 04 — RECOMMENDED ACTION */}
           <div className="summary-section summary-action">
-            <span className="summary-index">05</span>
+            <span className="summary-index">04</span>
 
             <div>
               <span className="eyebrow">
@@ -1604,34 +1630,40 @@ function App() {
               </span>
 
               <p className="summary-action-title">
-                {recommendation.action}
+                Validate the inventory signal
               </p>
 
               <div className="summary-next-steps">
 
-                {recommendation.next_steps.map(
-                  (step: string, index: number) => (
-                    <div
-                      className="summary-step"
-                      key={index}
-                    >
-                      <span>
-                        {String(index + 1).padStart(2, "0")}
-                      </span>
+                <div className="summary-step">
+                  <span>01</span>
+                  <p>Review inventory movement records.</p>
+                </div>
 
-                      <p>{step}</p>
-                    </div>
-                  )
-                )}
+                <div className="summary-step">
+                  <span>02</span>
+                  <p>
+                    Compare replenishment timing and quantities
+                    against expected patterns.
+                  </p>
+                </div>
+
+                <div className="summary-step">
+                  <span>03</span>
+                  <p>
+                    Check whether the observed stock reduction
+                    was operationally expected.
+                  </p>
+                </div>
 
               </div>
             </div>
           </div>
 
 
-          {/* 06 — IMPORTANT CAVEAT */}
+          {/* 05 — IMPORTANT CAVEAT */}
           <div className="summary-section summary-caveat">
-            <span className="summary-index">06</span>
+            <span className="summary-index">05</span>
 
             <div>
               <span className="eyebrow">
