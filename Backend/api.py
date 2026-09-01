@@ -29,10 +29,17 @@ def root():
 
 
 @app.get("/investigation")
-def investigation():
+def investigation(scenario: str = "priority"):
 
     try:
-        result = run_investigation()
+        if scenario == "insufficient":
+            result = run_investigation(scenario="insufficient")
+
+        elif scenario == "limited":
+            result = run_investigation(scenario="limited")
+            
+        else:
+            result = run_investigation()
 
         if result is None:
             raise HTTPException(
@@ -46,6 +53,17 @@ def investigation():
         hybrid = result["hybrid"]
         confidence = result["confidence"]
         recommendation = result["recommendation"]
+
+        evidence_sufficiency = result.get(
+            "evidence_sufficiency",
+            {
+                "status": "UNKNOWN",
+                "baseline_months": 0,
+                "minimum_required": 2,
+                "reasons": []
+            }
+        )
+                        
 
         # --------------------------------------------------
         # Clean frontend-friendly response
@@ -82,6 +100,8 @@ def investigation():
                 for row in result["history"]
             ],
 
+            "evidence_sufficiency": evidence_sufficiency,       
+
             "priority": {
                 "score": case["priority_score"],
                 "level": case["priority_level"]
@@ -92,8 +112,10 @@ def investigation():
                     "actual": case["revenue"],
                     "expected": case["expected_revenue"],
                     "deviation_pct": case["revenue_deviation_pct"],
-                    "z_score": float(
-                        z_scores["revenue_z_score"]
+                    "z_score": (
+                        float(z_scores["revenue_z_score"])
+                        if z_scores is not None
+                        else None
                     )
                 },
 
@@ -101,8 +123,10 @@ def investigation():
                     "current_stock": case["current_stock"],
                     "reorder_level": case["reorder_level"],
                     "stock_change_pct": case["stock_change_pct"],
-                    "z_score": float(
-                        z_scores["stock_z_score"]
+                    "z_score": (
+                        float(z_scores["stock_z_score"])
+                        if z_scores is not None
+                        else None
                     ),
                     "status": case["inventory_status"],
                     "below_reorder": case["below_reorder"]
@@ -110,17 +134,35 @@ def investigation():
             },
 
             "signals": {
-                "revenue_declined": evidence[
-                    "cross_signal_evidence"
-                ]["revenue_declined"],
+                "revenue_declined": (
+                    evidence.get(
+                        "cross_signal_evidence",
+                        {}
+                    ).get(
+                        "revenue_declined",
+                        False
+                    )
+                ),
 
-                "inventory_declined": evidence[
-                    "cross_signal_evidence"
-                ]["inventory_declined"],
+                "inventory_declined": (
+                    evidence.get(
+                        "cross_signal_evidence",
+                        {}
+                    ).get(
+                        "inventory_declined",
+                        False
+                    )
+                ),
 
-                "dominant_signal": hybrid[
-                    "dominant_signal"
-                ]
+                "dominant_signal": (
+                    evidence.get(
+                        "cross_signal_evidence",
+                        {}
+                    ).get(
+                        "dominant_signal",
+                        "UNKNOWN"
+                    )
+                )
             },
 
             "hypothesis": result[

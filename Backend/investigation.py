@@ -1,8 +1,10 @@
+import pandas as pd
 from Backend.analytics import (
     get_top_investigation_case,
     get_case_history,
     analyze_case_history,
     calculate_z_scores,
+    assess_evidence_sufficiency,
     build_hybrid_assessment,
     build_evidence,
     calculate_hypothesis_confidence,
@@ -18,40 +20,245 @@ from Backend.nlp import analyze_hypothesis_language
 from Backend.recommendation import generate_recommendation
 
 
-def run_investigation():
-    """
-    Run the complete KPI investigation pipeline.
+def run_investigation(scenario="priority"):
 
-    Returns a structured dictionary containing:
-    - case
-    - historical analysis
-    - z-score analysis
-    - hybrid assessment
-    - evidence
-    - hypotheses
-    - NLP interpretation
-    - confidence
-    - recommendation
-    - final business summary
-    """
+    print("DEBUG RUN INVESTIGATION SCENARIO:", scenario)
+
+    if scenario == "insufficient":
+        top_case = {
+            "month": pd.Timestamp("2018-10-01"),
+            "region": "TEST",
+            "product_category_name": "abstention_test",
+            "warehouse_location": "TEST-Warehouse",
+            "revenue": 10000,
+            "expected_revenue": 15000,
+            "revenue_deviation_pct": -33.33,
+            "current_stock": 100,
+            "reorder_level": 200,
+            "stock_change_pct": -50.00,
+            "inventory_status": "CRITICAL",
+            "below_reorder": True,
+            "business_signal": "TEST_ABSTENTION",
+            "priority_score": 999,
+            "priority_level": "HIGH",
+            "revenue_score": 3,
+            "inventory_score": 6,
+            "reorder_score": 0,
+        }
+
+        history = pd.DataFrame([
+            {
+                "month": pd.Timestamp("2018-10-01"),
+                "region": "TEST",
+                "product_category_name": "abstention_test",
+                "revenue": 10000,
+                "expected_revenue": 15000,
+                "revenue_deviation_pct": -33.33,
+                "current_stock": 100,
+                "reorder_level": 200,
+                "stock_change_pct": -50.00,
+                "inventory_status": "CRITICAL",
+                "business_signal": "TEST_ABSTENTION",
+                "priority_score": 999,
+                "priority_level": "HIGH",
+            }
+        ])
+
+    elif scenario == "limited":
+        top_case = {
+            "month": pd.Timestamp("2018-10-01"),
+            "region": "TEST",
+            "product_category_name": "limited_evidence_test",
+            "warehouse_location": "TEST-Warehouse",
+            "revenue": 12000,
+            "expected_revenue": 15000,
+            "revenue_deviation_pct": -20.00,
+            "current_stock": 150,
+            "reorder_level": 200,
+            "stock_change_pct": -25.00,
+            "inventory_status": "LOW",
+            "below_reorder": True,
+            "business_signal": "TEST_LIMITED_EVIDENCE",
+            "priority_score": 900,
+            "priority_level": "HIGH",
+            "revenue_score": 4,
+            "inventory_score": 6,
+            "reorder_score": 1,
+        }
+
+        history = pd.DataFrame([
+            {
+                "month": pd.Timestamp("2018-08-01"),
+                "region": "TEST",
+                "product_category_name": "limited_evidence_test",
+                "revenue": 14000,
+                "expected_revenue": 14500,
+                "revenue_deviation_pct": -3.45,
+                "current_stock": 220,
+                "reorder_level": 200,
+                "stock_change_pct": 5.00,
+                "inventory_status": "HEALTHY",
+                "business_signal": "NORMAL",
+                "priority_score": 100,
+                "priority_level": "LOW",
+            },
+            {
+                "month": pd.Timestamp("2018-09-01"),
+                "region": "TEST",
+                "product_category_name": "limited_evidence_test",
+                "revenue": 13500,
+                "expected_revenue": 14500,
+                "revenue_deviation_pct": -6.90,
+                "current_stock": 200,
+                "reorder_level": 200,
+                "stock_change_pct": -9.09,
+                "inventory_status": "HEALTHY",
+                "business_signal": "NORMAL",
+                "priority_score": 120,
+                "priority_level": "LOW",
+            },
+            {
+                "month": pd.Timestamp("2018-10-01"),
+                "region": "TEST",
+                "product_category_name": "limited_evidence_test",
+                "revenue": 12000,
+                "expected_revenue": 15000,
+                "revenue_deviation_pct": -20.00,
+                "current_stock": 150,
+                "reorder_level": 200,
+                "stock_change_pct": -25.00,
+                "inventory_status": "LOW",
+                "business_signal": "TEST_LIMITED_EVIDENCE",
+                "priority_score": 900,
+                "priority_level": "HIGH",
+            }
+        ])
+
+    else:
+        top_case = get_top_investigation_case()
+
+        if top_case is None:
+            return None
+
+        history = get_case_history(
+            top_case["region"],
+            top_case["product_category_name"]
+        )
 
     # --------------------------------------------------
-    # 1. Get highest-priority investigation case
+    # 2A. Evidence sufficiency
     # --------------------------------------------------
 
-    top_case = get_top_investigation_case()
-
-    if top_case is None:
-        return None
-
-    # --------------------------------------------------
-    # 2. Get historical case data
-    # --------------------------------------------------
-
-    history = get_case_history(
-        top_case["region"],
-        top_case["product_category_name"]
+    evidence_sufficiency = assess_evidence_sufficiency(
+        history,
+        top_case["month"]
     )
+
+    # --------------------------------------------------
+    # 2B. Evidence sufficiency gate
+    # --------------------------------------------------
+
+    if evidence_sufficiency["status"] == "INSUFFICIENT":
+
+        reasons = evidence_sufficiency.get(
+            "reasons",
+            []
+        )
+
+        return {
+            "case": top_case,
+
+            "history": history.to_dict(
+                orient="records"
+            ),
+
+            "analysis": None,
+
+            "z_scores": None,
+
+            "hybrid": None,
+
+            "evidence": {
+                "status": "INSUFFICIENT",
+                "available_evidence": {
+                    "baseline_months":
+                        evidence_sufficiency[
+                            "baseline_months"
+                        ]
+                },
+                "reasons": reasons
+            },
+
+            "evidence_sufficiency":
+                evidence_sufficiency,
+
+            "hypotheses": [],
+
+            "nlp": [],
+
+            "selected_hypothesis": {
+                "type": "INSUFFICIENT_EVIDENCE",
+                "statement":
+                    "The available evidence is insufficient "
+                    "to identify a reliable underlying driver."
+            },
+
+            "confidence": {
+                "confidence_score": 0,
+                "confidence_level": "INSUFFICIENT",
+                "supporting_score": 0,
+                "weakening_score": 0,
+                "evidence_breakdown": []
+            },
+
+            "recommendation": {
+                "action":
+                    "Do not attribute the KPI change "
+                    "to a specific cause yet.",
+
+                "urgency": "MONITOR",
+
+                "priority":
+                    top_case["priority_level"],
+
+                "priority_score":
+                    top_case["priority_score"],
+
+                "confidence": {
+                    "score": 0,
+                    "level": "INSUFFICIENT"
+                },
+
+                "reason": [
+                    "Historical evidence is insufficient "
+                    "for reliable causal interpretation."
+                ],
+
+                "weakening_factors": reasons,
+
+                "next_steps": [
+                    "Collect additional historical observations.",
+                    "Add relevant operational or business context.",
+                    "Re-run the investigation when additional evidence is available."
+                ],
+
+                "confidence_note":
+                    "The engine abstained because "
+                    "the available evidence is insufficient.",
+
+                "causal_warning":
+                    "No causal conclusion should be drawn "
+                    "from the current evidence.",
+
+                "signal_strength": 0
+            },
+
+            "business_summary":
+                "The investigation identified a business signal, "
+                "but there is insufficient historical evidence "
+                "to determine whether the observed change is "
+                "unusual or to support a specific underlying explanation."
+        }
 
     # --------------------------------------------------
     # 3. Historical analysis
@@ -69,7 +276,7 @@ def run_investigation():
     z_scores = calculate_z_scores(
         history,
         top_case["month"]
-    )
+    )   
 
     # --------------------------------------------------
     # 5. Hybrid assessment
@@ -106,6 +313,7 @@ def run_investigation():
             "z_scores": z_scores,
             "hybrid": hybrid,
             "evidence": evidence,
+            "evidence_sufficiency": evidence_sufficiency,
             "hypotheses": None,
             "nlp": None,
             "confidence": None,
@@ -159,6 +367,52 @@ def run_investigation():
     )
 
     # --------------------------------------------------
+    # 10B. Evidence sufficiency confidence adjustment
+    # --------------------------------------------------
+
+    if evidence_sufficiency["status"] == "LIMITED":
+
+        original_score = confidence["confidence_score"]
+
+        # Penalize confidence because the historical baseline
+        # is small, even when the evidence points in one direction.
+        adjusted_score = min(
+            original_score * 0.75,
+            0.60
+        )
+
+        confidence["confidence_score"] = round(
+            adjusted_score,
+            2
+        )
+
+        if adjusted_score >= 0.70:
+            confidence["confidence_level"] = "HIGH"
+        elif adjusted_score >= 0.50:
+            confidence["confidence_level"] = "MEDIUM"
+        else:
+            confidence["confidence_level"] = "LOW"
+
+        confidence.setdefault(
+            "evidence_breakdown",
+            []
+        )
+
+        confidence["evidence_breakdown"].append(
+            (
+                "Limited historical baseline",
+                -1
+            )
+        )
+
+        confidence["confidence_note"] = (
+            "Confidence is reduced because only a limited "
+            "historical baseline is available."
+        )
+
+
+
+    # --------------------------------------------------
     # 11. Recommendation
     # --------------------------------------------------
 
@@ -198,6 +452,8 @@ def run_investigation():
         "hybrid": hybrid,
 
         "evidence": evidence,
+
+        "evidence_sufficiency": evidence_sufficiency,
 
         "hypotheses": [
             {

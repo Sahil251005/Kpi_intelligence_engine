@@ -222,6 +222,84 @@ def calculate_z_scores(history, target_month):
         return None
 
     return df
+
+def assess_evidence_sufficiency(history, target_month):
+    """
+    Determine whether enough historical evidence exists
+    to support a reliable investigation.
+
+    This is a gate before hypothesis generation.
+
+    The function does not decide the cause.
+    It only determines whether the available evidence
+    is sufficient for statistical interpretation.
+    """
+
+    reasons = []
+
+    if history is None or history.empty:
+        return {
+            "status": "INSUFFICIENT",
+            "baseline_months": 0,
+            "minimum_required": 2,
+            "reasons": [
+                "No historical observations are available."
+            ]
+        }
+
+    baseline = history[
+        history["month"] < target_month
+    ]
+
+    baseline_months = len(baseline)
+
+    if baseline_months == 0:
+        reasons.append(
+            "No historical observations exist before the investigation period."
+        )
+
+    elif baseline_months == 1:
+        reasons.append(
+            "Only one historical observation is available; "
+            "statistical comparison is unreliable."
+        )
+
+    elif baseline_months == 2:
+        reasons.append(
+            "Only two historical observations are available; "
+            "the statistical baseline is limited."
+        )
+
+    if baseline_months < 2:
+
+        return {
+            "status": "INSUFFICIENT",
+            "baseline_months": baseline_months,
+            "minimum_required": 2,
+            "reasons": reasons
+        }
+
+    if baseline_months < 4:
+
+        return {
+            "status": "LIMITED",
+            "baseline_months": baseline_months,
+            "minimum_required": 2,
+            "reasons": reasons + [
+                "Historical baseline exists but is limited."
+            ]
+        }
+
+    return {
+        "status": "SUFFICIENT",
+        "baseline_months": baseline_months,
+        "minimum_required": 2,
+        "reasons": [
+            "Sufficient historical observations are available "
+            "for statistical comparison."
+        ]
+    }
+
 def build_hybrid_assessment(top_case, z_scores):
     """
     Combine SQL business severity with statistical context.
@@ -608,4 +686,53 @@ def calculate_hypothesis_confidence(hypothesis, evidence, nlp_result):
         "supporting_score": supporting_score,
         "weakening_score": weakening_score,
         "evidence_breakdown": evidence_breakdown
+    }
+
+def assess_evidence_sufficiency(history, target_month):
+    """
+    Assess whether enough historical evidence exists
+    to support a reliable investigation.
+    """
+
+    if history is None or history.empty:
+        return {
+            "status": "INSUFFICIENT",
+            "baseline_months": 0,
+            "minimum_required": 2,
+            "reasons": [
+                "No historical observations are available."
+            ]
+        }
+
+    baseline = history[
+        history["month"] < target_month
+    ]
+
+    baseline_months = len(baseline)
+
+    if baseline_months < 2:
+        return {
+            "status": "INSUFFICIENT",
+            "baseline_months": baseline_months,
+            "minimum_required": 2,
+            "reasons": [
+                "Fewer than 2 historical observations are available."
+            ]
+        }
+
+    if baseline_months < 4:
+        return {
+            "status": "LIMITED",
+            "baseline_months": baseline_months,
+            "minimum_required": 2,
+            "reasons": [
+                "Only a small historical baseline is available."
+            ]
+        }
+
+    return {
+        "status": "SUFFICIENT",
+        "baseline_months": baseline_months,
+        "minimum_required": 2,
+        "reasons": []
     }

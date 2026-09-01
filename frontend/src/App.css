@@ -32,6 +32,95 @@ button {
     #090b10;
 }
 
+/* ---------------- PERSONA SWITCH ---------------- */
+
+.persona-switch {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.persona-label {
+  color: #707786;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.persona-options {
+  display: flex;
+  align-items: center;
+  padding: 3px;
+
+  border: 1px solid #2b3040;
+  border-radius: 8px;
+
+  background: #11141b;
+}
+
+.persona-option {
+  border: none;
+  background: transparent;
+
+  color: #737b8c;
+
+  padding: 7px 11px;
+
+  border-radius: 6px;
+
+  font-size: 10px;
+  font-weight: 600;
+
+  cursor: pointer;
+
+  transition:
+    background 0.2s ease,
+    color 0.2s ease;
+}
+
+.persona-option:hover {
+  color: #dce0e7;
+}
+
+.persona-option.active {
+  background: #252a35;
+  color: #ffffff;
+}
+
+.scenario-selector {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.scenario-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  opacity: 0.55;
+}
+
+.scenario-selector select {
+  min-width: 170px;
+  padding: 9px 32px 9px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  color: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  outline: none;
+  cursor: pointer;
+}
+
+.scenario-selector select option {
+  background: #11141b;
+  color: #ffffff;
+}
+
+.scenario-selector select:focus {
+  border-color: rgba(255, 255, 255, 0.28);
+}
 
 /* ---------------- HEADER ---------------- */
 
@@ -235,6 +324,55 @@ main {
 
   color: #d7dae0;
   font-size: 13px;
+}
+
+.abstention-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  margin: 24px 0;
+  padding: 18px 20px;
+  border: 1px solid rgba(255, 180, 80, 0.35);
+  border-radius: 12px;
+  background: rgba(255, 180, 80, 0.06);
+}
+
+.abstention-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  border-radius: 50%;
+  font-size: 14px;
+  font-weight: 700;
+  background: rgba(255, 180, 80, 0.15);
+}
+
+.abstention-content {
+  min-width: 0;
+}
+
+.abstention-title {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.abstention-message {
+  margin-top: 5px;
+  font-size: 13px;
+  line-height: 1.5;
+  opacity: 0.75;
+}
+
+.abstention-meta {
+  margin-top: 9px;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.55;
 }
 
 /* ---------------- INVESTIGATION OUTCOME ---------------- */
@@ -920,6 +1058,64 @@ main {
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+
+/* ---------------- EVIDENCE ABSTENTION ---------------- */
+
+.abstention-banner {
+  display: flex;
+  align-items: flex-start;
+
+  gap: 14px;
+
+  margin: 18px auto 0;
+  padding: 16px 20px;
+
+  max-width: 1200px;
+
+  border: 1px solid #3a3540;
+  border-radius: 10px;
+
+  background: #15131a;
+}
+
+.abstention-icon {
+  display: flex;
+
+  width: 28px;
+  height: 28px;
+
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 50%;
+
+  background: #29232d;
+
+  color: #d7b6e5;
+
+  font-weight: 700;
+}
+
+.abstention-banner strong {
+  display: block;
+
+  margin-top: 3px;
+
+  color: #ffffff;
+
+  font-size: 14px;
+}
+
+.abstention-banner p {
+  margin: 6px 0 0;
+
+  max-width: 760px;
+
+  color: #858b99;
+
+  font-size: 12px;
+  line-height: 1.6;
 }
 
 /* ---------------- HYPOTHESIS ---------------- */
@@ -1982,6 +2178,15 @@ main {
 
 @media (max-width: 900px) {
 
+  .persona-label {
+    display: none;
+  }
+
+  .persona-option {
+    padding: 6px 8px;
+    font-size: 9px;
+  }
+
   main {
     width: min(100% - 35px, 700px);
   }
@@ -2085,6 +2290,9 @@ main {
 }
 
 @media (max-width: 700px) {
+  .persona-switch {
+    display: none;
+  }
   .topbar {
     align-items: flex-start;
     gap: 18px;
@@ -2111,4 +2319,144 @@ main {
   .subtitle {
     font-size: 9px;
   }
+}
+
+.evidence-quality {
+  margin-top: 18px;
+  padding: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.evidence-quality-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 22px;
+}
+
+.evidence-quality-header h2 {
+  margin: 6px 0 0;
+  font-size: 20px;
+  font-weight: 650;
+}
+
+.evidence-quality-status {
+  padding: 7px 11px;
+  border-radius: 7px;
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+}
+
+.evidence-quality-status.sufficient {
+  background: rgba(120, 210, 160, 0.10);
+  border: 1px solid rgba(120, 210, 160, 0.20);
+}
+
+.evidence-quality-status.limited {
+  background: rgba(255, 190, 90, 0.10);
+  border: 1px solid rgba(255, 190, 90, 0.22);
+}
+
+.evidence-quality-status.insufficient {
+  background: rgba(255, 110, 110, 0.10);
+  border: 1px solid rgba(255, 110, 110, 0.22);
+}
+
+.evidence-quality-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.evidence-quality-item {
+  padding: 18px 20px 4px 0;
+}
+
+.evidence-quality-item + .evidence-quality-item {
+  padding-left: 20px;
+  border-left: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.evidence-quality-item > span {
+  display: block;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  opacity: 0.48;
+}
+
+.evidence-quality-item strong {
+  display: block;
+  margin-top: 8px;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.evidence-quality-item p {
+  margin: 5px 0 0;
+  font-size: 11px;
+  line-height: 1.5;
+  opacity: 0.52;
+}
+
+.abstention-section {
+  margin-top: 28px;
+}
+
+.abstention-detail-grid {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr 1fr;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.abstention-detail-card {
+  padding: 24px;
+  border: 1px solid rgba(255, 180, 80, 0.16);
+  border-radius: 12px;
+  background: rgba(255, 180, 80, 0.035);
+}
+
+.abstention-detail-card h3 {
+  margin: 14px 0 12px;
+  font-size: 18px;
+  line-height: 1.35;
+}
+
+.abstention-detail-card > p {
+  margin: 0;
+  color: #aeb5c4;
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.abstention-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.abstention-list > div {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.abstention-list > div > span {
+  flex: 0 0 24px;
+  font-size: 10px;
+  font-weight: 700;
+  opacity: 0.45;
+}
+
+.abstention-list p {
+  margin: 0;
+  color: #aeb5c4;
+  font-size: 12px;
+  line-height: 1.5;
 }
