@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   LineChart,
   Line,
@@ -12,6 +12,12 @@ import {
   Legend,
 } from "recharts";
 import "./App.css";
+
+type InvestigationScenario =
+  | "priority"
+  | "limited"
+  | "insufficient"
+  | "sparse";
 
 type HistoryRecord = {
   month: string;
@@ -29,6 +35,72 @@ type HistoryRecord = {
   priority_level: string;
 };
 
+type Persona = "EXECUTIVE" | "OPERATIONS";
+
+type DriverDecomposition = {
+  baseline_months: number;
+  baseline_source: "OWN_HISTORY" | "PEER_CONTEXT";
+
+  baseline_revenue: number | null;
+  target_revenue: number | null;
+
+  revenue_change: number | null;
+  revenue_change_pct: number | null;
+
+  baseline_orders: number | null;
+  target_orders: number | null;
+
+  baseline_aov: number | null;
+  target_aov: number | null;
+
+  drivers: {
+    driver: string;
+    metric: string;
+    baseline: number;
+    target: number;
+    change: number;
+    contribution: number;
+    contribution_pct: number;
+    direction: string;
+    rank: number;
+  }[];
+
+  inventory_signal: {
+    driver: string;
+    baseline: number;
+    target: number;
+    change: number;
+    direction: string;
+    role: string;
+  } | null;
+
+  peer_context?: {
+    peer_months: number;
+    peer_categories: number;
+    description: string;
+  };
+};
+
+type EvidenceLineage = {
+  source: string;
+  dataset: string;
+  method: string;
+  freshness: string;
+  contribution: "PRIMARY" | "SUPPORTING" | "INTERPRETATION";
+  confidence: number;
+};
+
+type RuntimeTelemetry = {
+    total_runtime_ms: number;
+    analytics_runtime_ms: number;
+    hypothesis_llm_runtime_ms: number;
+    summary_llm_runtime_ms: number;
+    llm_runtime_ms: number;
+    llm_used: boolean;
+    decision_path: string;
+    evidence_sources: number;
+  };
+
 type Investigation = {
   case: {
     month: string;
@@ -37,21 +109,20 @@ type Investigation = {
     warehouse: string;
   };
 
-  history: {
-    month: string;
-    region: string;
-    product_category_name: string;
-    revenue: number;
-    expected_revenue: number;
-    revenue_deviation_pct: number;
-    current_stock: number;
-    reorder_level: number;
-    stock_change_pct: number;
-    inventory_status: string;
-    business_signal: string;
-    priority_score: number;
-    priority_level: string;
-  }[];
+  evidence_sufficiency: {
+    status: "SUFFICIENT" | "LIMITED" | "INSUFFICIENT" | "UNKNOWN";
+    baseline_months: number;
+    minimum_required: number;
+    reasons: string[];
+  };
+
+  history: HistoryRecord[];
+
+  driver_decomposition: DriverDecomposition | null;
+
+  evidence_lineage: EvidenceLineage[];
+
+  runtime_telemetry: RuntimeTelemetry;
 
   priority: {
     score: number;
@@ -63,14 +134,14 @@ type Investigation = {
       actual: number;
       expected: number;
       deviation_pct: number;
-      z_score: number;
+      z_score: number | null;
     };
 
     inventory: {
       current_stock: number;
       reorder_level: number;
       stock_change_pct: number;
-      z_score: number;
+      z_score: number | null;
       status: string;
       below_reorder: boolean;
     };
@@ -162,6 +233,33 @@ function getSummarySection(
 }
 
 function App() {
+
+  const [persona, setPersona] =
+    useState<Persona>("EXECUTIVE");
+
+  const [scenario, setScenario] =
+    useState<InvestigationScenario>("priority");
+
+  const [feedbackUsefulness, setFeedbackUsefulness] =
+    useState<"USEFUL" | "NOT_USEFUL" | "">("");
+
+  const [feedbackDriver, setFeedbackDriver] =
+    useState<
+      "SUPPORTED" |
+      "PARTIALLY_SUPPORTED" |
+      "NOT_SUPPORTED" |
+      ""
+    >("");
+
+  const [feedbackComment, setFeedbackComment] =
+    useState("");
+
+  const [feedbackSubmitted, setFeedbackSubmitted] =
+    useState(false);
+
+  const [feedbackLoading, setFeedbackLoading] =
+    useState(false);
+
   const [investigation, setInvestigation] =
     useState<Investigation | null>(null);
 
@@ -174,15 +272,18 @@ function App() {
   const [running, setRunning] =
     useState(false);
 
-  const initialRunRef = useRef(false);
-
   const runInvestigation = async () => {
     try {
       setRunning(true);
       setError("");
 
+      const scenarioParam =
+        scenario === "priority"
+          ? ""
+          : `?scenario=${scenario}`;
+
       const response = await fetch(
-        "http://127.0.0.1:8001/investigation"
+        `http://127.0.0.1:8001/investigation${scenarioParam}`
       );
 
       if (!response.ok) {
@@ -219,15 +320,77 @@ function App() {
     }
   };
 
-  useEffect(() => {
-    if (initialRunRef.current) {
+  const submitFeedback = async () => {
+
+    if (!investigation) {
       return;
     }
 
-    initialRunRef.current = true;
+    if (!feedbackUsefulness || !feedbackDriver) {
+      return;
+    }
 
+    setFeedbackLoading(true);
+
+    try {
+
+      const response = await fetch(
+        "http://127.0.0.1:8001/feedback",
+        {
+          method: "POST",
+
+          headers: {
+            "Content-Type": "application/json",
+          },
+
+          body: JSON.stringify({
+            case_month: investigation.case.month,
+
+            region: investigation.case.region,
+
+            product_category:
+              investigation.case.category,
+
+            warehouse:
+              investigation.case.warehouse,
+
+            usefulness:
+              feedbackUsefulness,
+
+            driver_assessment:
+              feedbackDriver,
+
+            comment:
+              feedbackComment.trim() || null,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          "Failed to submit feedback."
+        );
+      }
+
+      setFeedbackSubmitted(true);
+
+    } catch (error) {
+
+      console.error(
+        "Feedback submission failed:",
+        error
+      );
+
+    } finally {
+
+      setFeedbackLoading(false);
+
+    }
+  };
+
+  useEffect(() => {
     runInvestigation();
-  }, []);
+  }, [scenario]);
 
   if (loading) {
     return (
@@ -262,6 +425,128 @@ function App() {
     return null;
   }
 
+  const isExecutive = persona === "EXECUTIVE";
+
+  const scenarioContent = {
+    priority: {
+      heroEyebrow: "INVESTIGATION REQUIRED",
+
+      heroDescription:
+        "A high-priority business signal requires attention across revenue and inventory performance.",
+
+      outcomeTitle:
+        "Revenue and inventory declined together.",
+
+      outcomeDescription:
+        "Inventory is the dominant business signal and requires validation against operational activity.",
+
+      hypothesisTitle:
+        "Evidence supports investigation",
+
+      confidenceTitle:
+        "Evidence supports the investigation, but uncertainty remains.",
+
+      summaryStatus:
+        "INVESTIGATION COMPLETE",
+    },
+
+    limited: {
+      heroEyebrow: "LIMITED EVIDENCE",
+
+      heroDescription:
+        "A business signal has been detected, but the available historical baseline is limited.",
+
+      outcomeTitle:
+        "The signal is visible, but the historical baseline is thin.",
+
+      outcomeDescription:
+        "The investigation can identify a direction, but confidence is deliberately constrained by limited historical evidence.",
+
+      hypothesisTitle:
+        "Evidence suggests a possible driver",
+
+      confidenceTitle:
+        "The evidence points toward a driver, but limited history constrains confidence.",
+
+      summaryStatus:
+        "LIMITED EVIDENCE",
+    },
+
+    insufficient: {
+      heroEyebrow:
+        "EVIDENCE INSUFFICIENT",
+
+      heroDescription:
+        "A business signal was detected, but there is not enough historical evidence to support a reliable explanation.",
+
+      outcomeTitle:
+        "A business signal was detected, but the cause remains unconfirmed.",
+
+      outcomeDescription:
+        "The engine deliberately abstained from assigning a specific driver because the available historical evidence is insufficient.",
+
+      hypothesisTitle:
+        "No reliable hypothesis assigned",
+
+      confidenceTitle:
+        "The engine abstained because the available evidence is insufficient.",
+
+      summaryStatus:
+        "INVESTIGATION PAUSED",
+    },
+
+      sparse: {
+      heroEyebrow: "SPARSE HISTORY",
+      heroDescription:
+        "A business signal has been detected, but the category has limited historical observations.",
+      outcomeTitle:
+        "The signal is visible, but category-specific attribution is constrained.",
+      outcomeDescription:
+        "Peer-category history is available as contextual benchmark evidence, but it is not used as a substitute baseline for revenue decomposition.",
+      hypothesisTitle:
+        "No category-specific driver assigned",
+      confidenceTitle:
+        "Confidence is deliberately low because the category has sparse own history.",
+      summaryStatus:
+        "LIMITED EVIDENCE",
+    },
+  };
+
+  const currentScenarioContent =
+    scenarioContent[scenario];
+
+  const personaContent = {
+
+    heroDescription: isExecutive
+      ? "A high-priority business signal requires attention across revenue and inventory performance."
+      : "A high-priority signal requires operational validation across inventory movement, replenishment activity and revenue behavior.",
+
+    whyItMatters: isExecutive
+      ? "Inventory is the dominant business signal and represents the primary operational risk requiring leadership attention."
+      : "Inventory movement is statistically extreme relative to historical behavior and should be validated against movement and replenishment records.",
+
+    actionTitle: isExecutive
+      ? "Validate the inventory signal before making a business decision."
+      : "Trace inventory depletion and replenishment activity.",
+
+    actionDescription: isExecutive
+      ? "Validate the operational evidence before attributing the revenue movement to inventory."
+      : "Review inventory movements, replenishment timing, quantities and historical stock behavior for the affected period.",
+
+    confidenceDescription: isExecutive
+      ? "The evidence is strong enough to justify attention, but not strong enough to establish causation."
+      : "The score reflects the strength of the available evidence and highlights which operational facts still require validation.",
+
+    decisionStatus: isExecutive
+      ? "Leadership review recommended"
+      : "Operational validation recommended",
+
+    decisionDescription: isExecutive
+      ? "The evidence supports investigation while causation remains unconfirmed."
+      : "Validate the inventory movement against operational records before escalating the finding.",
+
+  };
+
   const {
     case: investigationCase,
     history,
@@ -270,9 +555,15 @@ function App() {
     signals,
     hypothesis,
     confidence,
-    recommendation,
     business_summary,
+    evidence_sufficiency,
+    driver_decomposition,
+    evidence_lineage,  
+    runtime_telemetry,  
   } = investigation;
+
+  const isAbstained =
+    evidence_sufficiency?.status === "INSUFFICIENT";
 
   const chartData = Array.isArray(history)
     ? history.map((item) => {
@@ -376,6 +667,71 @@ function App() {
         </div>
 
         <div className="header-actions">
+          <div className="persona-switch">
+
+            <span className="persona-label">
+              VIEW AS
+            </span>
+
+            <div className="persona-options">
+
+              <button
+                className={
+                  persona === "EXECUTIVE"
+                    ? "persona-option active"
+                    : "persona-option"
+                }
+                onClick={() => setPersona("EXECUTIVE")}
+              >
+                Executive
+              </button>
+
+              <button
+                className={
+                  persona === "OPERATIONS"
+                    ? "persona-option active"
+                    : "persona-option"
+                }
+                onClick={() => setPersona("OPERATIONS")}
+              >
+                Operations
+              </button>
+
+            </div>
+
+          </div>
+          
+          <div className="scenario-selector">
+            <div className="scenario-label">
+              INVESTIGATION SCENARIO
+            </div>
+
+            <select
+              value={scenario}
+              onChange={(e) =>
+                setScenario(
+                  e.target.value as InvestigationScenario
+                )
+              }
+            >
+              <option value="priority">
+                Priority Case
+              </option>
+
+              <option value="limited">
+                Limited Evidence
+              </option>
+
+              <option value="insufficient">
+                Insufficient Evidence
+              </option>
+
+              <option 
+              value="sparse">Sparse History
+              </option> 
+            </select>
+          </div>
+
           <button
             className="run-button"
             onClick={runInvestigation}
@@ -410,9 +766,9 @@ function App() {
 
           <div className="hero-left">
 
-            <div className="eyebrow">
-              INVESTIGATION REQUIRED
-            </div>
+            <span className="eyebrow">
+              {currentScenarioContent.heroEyebrow}
+            </span>
 
             <h1>
               {investigation.signals.dominant_signal === "INVENTORY" ? (
@@ -437,8 +793,9 @@ function App() {
             </h1>
 
             <p className="hero-description">
-              A high-priority business signal requires investigation
-              across revenue and inventory performance.
+              {isAbstained
+                ? currentScenarioContent.heroDescription
+                : personaContent.heroDescription}
             </p>
 
             <div className="case-context">
@@ -587,7 +944,9 @@ function App() {
             </div>
 
             <div className="metric-secondary">
-              Z-score {key_metrics.inventory.z_score.toFixed(2)}
+              Z-score {key_metrics.inventory.z_score !== null
+                ? key_metrics.inventory.z_score.toFixed(2)
+                : "N/A"}
             </div>
 
           </div>
@@ -614,6 +973,120 @@ function App() {
           </div>
 
         </section>
+
+        {/* EVIDENCE QUALITY */}
+
+        <section className="evidence-quality">
+
+          <div className="evidence-quality-header">
+
+            <div>
+              <span className="eyebrow">
+                EVIDENCE QUALITY
+              </span>
+
+              <h2>
+                How much evidence does the engine have?
+              </h2>
+            </div>
+
+            <div
+              className={`evidence-quality-status ${evidence_sufficiency.status.toLowerCase()}`}
+            >
+              {evidence_sufficiency.status}
+            </div>
+
+          </div>
+
+          <div className="evidence-quality-grid">
+
+            <div className="evidence-quality-item">
+
+              <span>
+                HISTORICAL BASELINE
+              </span>
+
+              <strong>
+                {evidence_sufficiency.baseline_months}
+              </strong>
+
+              <p>
+                historical observations available
+              </p>
+
+            </div>
+
+
+            <div className="evidence-quality-item">
+
+              <span>
+                MINIMUM REQUIRED
+              </span>
+
+              <strong>
+                {evidence_sufficiency.minimum_required}
+              </strong>
+
+              <p>
+                observations required for investigation
+              </p>
+
+            </div>
+
+
+            <div className="evidence-quality-item">
+
+              <span>
+                ENGINE DECISION
+              </span>
+
+              <strong>
+                {evidence_sufficiency.status === "SUFFICIENT"
+                  ? "INVESTIGATE"
+                  : evidence_sufficiency.status === "LIMITED"
+                  ? "CAUTIOUS"
+                  : "ABSTAIN"}
+              </strong>
+
+              <p>
+                {evidence_sufficiency.status === "SUFFICIENT"
+                  ? "Normal investigation confidence"
+                  : evidence_sufficiency.status === "LIMITED"
+                  ? "Confidence is deliberately constrained"
+                  : "No causal attribution is produced"}
+              </p>
+
+            </div>
+
+          </div>
+
+        </section>
+
+        {isAbstained && (
+          <div className="abstention-banner">
+            <div className="abstention-icon">
+              !
+            </div>
+
+            <div className="abstention-content">
+              <div className="abstention-title">
+                Investigation paused — insufficient evidence
+              </div>
+
+              <div className="abstention-message">
+                The engine detected a business signal but deliberately
+                avoided assigning a specific cause because the available
+                historical evidence is insufficient.
+              </div>
+
+              <div className="abstention-meta">
+                {evidence_sufficiency?.baseline_months ?? 0} historical
+                observations available ·{" "}
+                {evidence_sufficiency?.minimum_required ?? 2} required
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* INVESTIGATION OUTCOME */}
 
@@ -645,7 +1118,7 @@ function App() {
               </span>
 
               <h3>
-                Revenue and inventory declined together.
+                {currentScenarioContent.outcomeTitle}
               </h3>
 
               <div className="outcome-metrics">
@@ -672,6 +1145,10 @@ function App() {
 
               </div>
 
+              <p>
+                {currentScenarioContent.outcomeDescription}
+              </p>
+
             </div>
 
 
@@ -684,13 +1161,13 @@ function App() {
               </span>
 
               <h3>
-                Inventory is the dominant business signal.
+                {isExecutive
+                  ? "Inventory is the dominant business signal."
+                  : "Inventory movement requires operational validation."}
               </h3>
 
               <p>
-                Inventory movement is statistically extreme relative
-                to historical behavior, making inventory depletion the
-                primary signal requiring investigation.
+                {personaContent.whyItMatters}
               </p>
 
             </div>
@@ -705,13 +1182,11 @@ function App() {
               </span>
 
               <h3>
-                Investigate inventory depletion and replenishment activity.
+                {personaContent.actionTitle}
               </h3>
 
               <p>
-                Review inventory movement records, replenishment timing
-                and quantities, and whether the observed stock reduction
-                was expected.
+                {personaContent.actionDescription}
               </p>
 
             </div>
@@ -735,498 +1210,1473 @@ function App() {
 
         </section>
 
+        {/* DRIVER DECOMPOSITION */}
+
+        {driver_decomposition && !isAbstained && (
+
+          <section className="driver-section">
+
+            {/* SECTION HEADER */}
+
+            <div className="section-heading">
+
+              <div>
+                <span className="eyebrow">
+                  REVENUE DRIVER DECOMPOSITION
+                </span>
+
+                <h2>
+                  What contributed to the revenue movement?
+                </h2>
+              </div>
+
+              <div className="driver-revenue-change">
+
+                <span>
+                  REVENUE CHANGE
+                </span>
+
+                <strong>
+                  {driver_decomposition.revenue_change_pct !== null
+                  ? `${driver_decomposition.revenue_change_pct.toFixed(2)}%`
+                  : "—"}
+                </strong>
+
+                <small>
+                  NET MOVEMENT
+                </small>
+
+              </div>
+
+            </div>
+
+
+            {/* MAIN TWO-COLUMN LAYOUT */}
+
+            <div className="driver-layout">
+
+
+              {/* ================================================== */}
+              {/* LEFT COLUMN                                        */}
+              {/* ================================================== */}
+
+              <div className="driver-left-column">
+
+                <div className="driver-card">
+                  <div className="driver-card-header">
+                    <span>
+                      {driver_decomposition?.baseline_source === "PEER_CONTEXT"
+                        ? "Peer Benchmark"
+                        : "Revenue Components"}
+                    </span>
+
+                    <span className="driver-card-header-meta">
+                      {driver_decomposition?.baseline_source === "PEER_CONTEXT"
+                        ? "CONTEXT ONLY"
+                        : `${driver_decomposition?.baseline_months ?? 0} MONTH BASELINE`}
+                    </span>
+                  </div>
+
+                  {driver_decomposition?.baseline_source === "PEER_CONTEXT" ? (
+                    <div className="peer-context-content">
+
+                      <div className="peer-context-badge">
+                        PEER BENCHMARK · CONTEXT ONLY
+                      </div>
+
+                      <div className="peer-context-title">
+                        Category-specific attribution withheld
+                      </div>
+
+                      <p className="peer-context-description">
+                        The category has limited own history, so peer-category
+                        behavior is used for contextual comparison rather than
+                        as a substitute revenue baseline.
+                      </p>
+
+                      <div className="peer-context-stats">
+
+                        <div className="peer-context-stat">
+                          <strong>
+                            {driver_decomposition.peer_context?.peer_months ?? 0}
+                          </strong>
+                          <span>PEER MONTHS</span>
+                        </div>
+
+                        <div className="peer-context-stat">
+                          <strong>
+                            {driver_decomposition.peer_context?.peer_categories ?? 0}
+                          </strong>
+                          <span>PEER CATEGORIES</span>
+                        </div>
+
+                        <div className="peer-context-stat">
+                          <strong>
+                            {driver_decomposition.baseline_months ?? 0}
+                          </strong>
+                          <span>OWN MONTHS</span>
+                        </div>
+
+                      </div>
+
+                      <div className="peer-context-note">
+                        <span>ATTRIBUTION STATUS</span>
+                        <strong>NO DRIVER ASSIGNED</strong>
+                      </div>
+
+                    </div>
+                  ) : (
+
+                    <div className="driver-card">
+
+                      <div className="driver-card-header">
+
+                        <span>
+                          REVENUE COMPONENTS
+                        </span>
+
+                        <span className="driver-method">
+                          DETERMINISTIC
+                        </span>
+
+                      </div>
+
+
+                      {driver_decomposition.drivers.map(
+                        (driver) => (
+
+                          <div
+                            className="driver-row"
+                            key={driver.driver}
+                          >
+
+                            <div className="driver-row-top">
+
+                              <div>
+
+                                <strong>
+                                  {driver.driver}
+                                </strong>
+
+                                <span>
+
+                                  {driver.baseline.toLocaleString(
+                                    undefined,
+                                    {
+                                      maximumFractionDigits: 2,
+                                    }
+                                  )}
+
+                                  {" → "}
+
+                                  {driver.target.toLocaleString(
+                                    undefined,
+                                    {
+                                      maximumFractionDigits: 2,
+                                    }
+                                  )}
+
+                                </span>
+
+                              </div>
+
+
+                              <div className="driver-contribution">
+
+                                <strong>
+
+                                  {driver.contribution_pct > 0
+                                    ? "+"
+                                    : ""}
+
+                                  {driver.contribution_pct.toFixed(1)}%
+
+                                </strong>
+
+                                <span>
+                                  contribution
+                                </span>
+
+                              </div>
+
+                            </div>
+
+
+                            <div className="driver-bar">
+
+                              <div
+                                className={`driver-bar-fill ${
+                                  driver.direction.toLowerCase()
+                                }`}
+                                style={{
+                                  width: `${Math.min(
+                                    Math.abs(
+                                      driver.contribution_pct
+                                    ),
+                                    100
+                                  )}%`,
+                                }}
+                              />
+
+                            </div>
+
+
+                            <div className="driver-change">
+
+                              {driver.change > 0
+                                ? "+"
+                                : ""}
+
+                              {driver.change.toLocaleString(
+                                undefined,
+                                {
+                                  maximumFractionDigits: 2,
+                                }
+                              )}
+
+                            </div>
+
+                          </div>
+
+                        )
+                      )}
+
+                    </div>
+                  )}
+
+                </div>
+
+
+                {/* ================================================== */}
+                {/* OPERATIONAL CONTEXT                               */}
+                {/* ================================================== */}
+
+                {driver_decomposition.inventory_signal && (
+
+                  <div className="driver-card inventory-context">
+
+                    <div className="driver-card-header">
+
+                      <span>
+                        OPERATIONAL CONTEXT
+                      </span>
+
+                      <span className="driver-method">
+                        SUPPORTING SIGNAL
+                      </span>
+
+                    </div>
+
+
+                    <div className="inventory-driver-content">
+
+                      <span className="outcome-label">
+                        INVENTORY MOVEMENT
+                      </span>
+
+
+                      <strong>
+
+                        {driver_decomposition.inventory_signal.target > 0
+                          ? "+"
+                          : ""}
+
+                        {driver_decomposition.inventory_signal.target.toFixed(2)}%
+
+                      </strong>
+
+
+                      <p>
+                        Inventory movement is shown as an
+                        operational signal that may help explain
+                        the revenue movement. It is not treated as
+                        a mathematical revenue component or causal
+                        proof.
+                      </p>
+
+                    </div>
+
+
+                    <div className="inventory-driver-meta">
+
+                      <div>
+
+                        <span>
+                          BASELINE
+                        </span>
+
+                        <strong>
+
+                          {driver_decomposition.inventory_signal
+                            .baseline.toFixed(2)}%
+
+                        </strong>
+
+                      </div>
+
+
+                      <div>
+
+                        <span>
+                          CHANGE
+                        </span>
+
+                        <strong>
+
+                          {driver_decomposition.inventory_signal
+                            .change > 0
+                            ? "+"
+                            : ""}
+
+                          {driver_decomposition.inventory_signal
+                            .change.toFixed(2)}%
+
+                        </strong>
+
+                      </div>
+
+                    </div>
+
+                  </div>
+
+                )}
+
+              </div>
+
+
+              {/* ================================================== */}
+              {/* RIGHT COLUMN                                       */}
+              {/* ================================================== */}
+
+              <section className="lineage-section">
+
+
+                <div className="section-heading">
+
+                  <div>
+
+                    <span className="eyebrow">
+                      EVIDENCE LINEAGE
+                    </span>
+
+                    <h2>
+                      Where the investigation evidence came from
+                    </h2>
+
+                  </div>
+
+                </div>
+
+
+                <div className="lineage-table">
+
+
+                  {/* TABLE HEADER */}
+
+                  <div className="lineage-header">
+
+                    <span>
+                      SOURCE
+                    </span>
+
+                    <span>
+                      METHOD
+                    </span>
+
+                    <span>
+                      FRESHNESS
+                    </span>
+
+                    <span>
+                      ROLE
+                    </span>
+
+                    <span>
+                      CONFIDENCE
+                    </span>
+
+                  </div>
+
+
+                  {/* TABLE ROWS */}
+
+                  {evidence_lineage.map(
+                    (item, index) => (
+
+                      <div
+                        className="lineage-row"
+                        key={`${item.source}-${index}`}
+                      >
+
+
+                        {/* SOURCE */}
+
+                        <div className="lineage-source">
+
+                          <strong>
+                            {item.source}
+                          </strong>
+
+                          <span>
+                            {item.dataset}
+                          </span>
+
+                        </div>
+
+
+                        {/* METHOD */}
+
+                        <div className="lineage-method">
+                          {item.method}
+                        </div>
+
+
+                        {/* FRESHNESS */}
+
+                        <div className="lineage-freshness">
+                          {item.freshness}
+                        </div>
+
+
+                        {/* ROLE */}
+
+                        <div>
+
+                          <span
+                            className={`lineage-role ${
+                              item.contribution.toLowerCase()
+                            }`}
+                          >
+                            {item.contribution}
+                          </span>
+
+                        </div>
+
+
+                        {/* CONFIDENCE */}
+
+                        <div className="lineage-confidence">
+
+                          <strong>
+
+                            {item.confidence !== null
+                              ? `${(
+                                  item.confidence * 100
+                                ).toFixed(0)}%`
+                              : "—"}
+
+                          </strong>
+
+                        </div>
+
+                      </div>
+
+                    )
+                  )}
+
+                </div>
+
+              </section>
+
+            </div>
+
+          </section>
+
+        )}
+
+        {/* ENGINE TELEMETRY */}
+
+        {runtime_telemetry && (
+
+          <section className="telemetry-section">
+
+            <div className="telemetry-header">
+
+              <div>
+                <span className="eyebrow">
+                  ENGINE TELEMETRY
+                </span>
+
+                <h2>
+                  How the investigation was produced
+                </h2>
+              </div>
+
+              <span
+                className={`telemetry-status ${
+                  runtime_telemetry.llm_used
+                    ? "used"
+                    : "not-used"
+                }`}
+              >
+                {runtime_telemetry.llm_used
+                  ? "LLM USED"
+                  : "LLM NOT USED"}
+              </span>
+
+            </div>
+
+
+            <div className="telemetry-card">
+
+
+              {/* TOTAL RUNTIME */}
+
+              <div className="telemetry-metric">
+
+                <span>
+                  TOTAL RUNTIME
+                </span>
+
+                <strong>
+                  {runtime_telemetry.total_runtime_ms >= 1000
+                    ? `${(
+                        runtime_telemetry.total_runtime_ms /
+                        1000
+                      ).toFixed(2)} s`
+                    : `${runtime_telemetry.total_runtime_ms.toFixed(2)} ms`}
+                </strong>
+
+              </div>
+
+
+              {/* ANALYTICS */}
+
+              <div className="telemetry-metric">
+
+                <span>
+                  ANALYTICS / SQL
+                </span>
+
+                <strong>
+                  {runtime_telemetry.analytics_runtime_ms >= 1000
+                    ? `${(
+                        runtime_telemetry.analytics_runtime_ms /
+                        1000
+                      ).toFixed(2)} s`
+                    : `${runtime_telemetry.analytics_runtime_ms.toFixed(2)} ms`}
+                </strong>
+
+              </div>
+
+
+              {/* LLM */}
+
+              <div className="telemetry-metric">
+
+                <span>
+                  LLM RUNTIME
+                </span>
+
+                <strong>
+                  {runtime_telemetry.llm_runtime_ms >= 1000
+                    ? `${(
+                        runtime_telemetry.llm_runtime_ms /
+                        1000
+                      ).toFixed(2)} s`
+                    : `${runtime_telemetry.llm_runtime_ms.toFixed(2)} ms`}
+                </strong>
+
+              </div>
+
+
+              {/* EVIDENCE SOURCES */}
+
+              <div className="telemetry-metric">
+
+                <span>
+                  EVIDENCE SOURCES
+                </span>
+
+                <strong>
+                  {runtime_telemetry.evidence_sources}
+                </strong>
+
+              </div>
+
+
+              {/* DECISION PATH */}
+
+              <div className="telemetry-path">
+
+                <span>
+                  DECISION PATH
+                </span>
+
+                <strong>
+                  {runtime_telemetry.decision_path}
+                </strong>
+
+              </div>
+
+
+              {/* LLM BREAKDOWN */}
+
+              {runtime_telemetry.llm_used && (
+
+                <div className="telemetry-breakdown">
+
+                  <div>
+
+                    <span>
+                      HYPOTHESIS LLM
+                    </span>
+
+                    <strong>
+                      {(
+                        runtime_telemetry
+                          .hypothesis_llm_runtime_ms /
+                        1000
+                      ).toFixed(2)} s
+                    </strong>
+
+                  </div>
+
+
+                  <div>
+
+                    <span>
+                      SUMMARY LLM
+                    </span>
+
+                    <strong>
+                      {(
+                        runtime_telemetry
+                          .summary_llm_runtime_ms /
+                        1000
+                      ).toFixed(2)} s
+                    </strong>
+
+                  </div>
+
+                </div>
+
+              )}
+
+            </div>
+
+          </section>
+
+        )}
+
+        {/* ANALYST FEEDBACK */}
+
+        {investigation && !isAbstained && (
+
+          <section className="feedback-section">
+
+            <div className="section-heading">
+
+              <div>
+                <span className="eyebrow">
+                  ANALYST FEEDBACK
+                </span>
+
+                <h2>
+                  Help improve the investigation
+                </h2>
+
+                <p className="feedback-description">
+                  Capture analyst judgment on whether the
+                  evidence and identified driver were useful.
+                </p>
+              </div>
+
+            </div>
+
+
+            {!feedbackSubmitted ? (
+
+              <div className="feedback-card">
+
+                {/* USEFULNESS */}
+
+                <div className="feedback-group">
+
+                  <span className="feedback-label">
+                    WAS THIS INVESTIGATION USEFUL?
+                  </span>
+
+                  <div className="feedback-options">
+
+                    <button
+                      type="button"
+                      className={`feedback-option ${
+                        feedbackUsefulness === "USEFUL"
+                          ? "selected"
+                          : ""
+                      }`}
+                      onClick={() =>
+                        setFeedbackUsefulness("USEFUL")
+                      }
+                    >
+                      ✓ Useful
+                    </button>
+
+                    <button
+                      type="button"
+                      className={`feedback-option ${
+                        feedbackUsefulness === "NOT_USEFUL"
+                          ? "selected"
+                          : ""
+                      }`}
+                      onClick={() =>
+                        setFeedbackUsefulness("NOT_USEFUL")
+                      }
+                    >
+                      × Not useful
+                    </button>
+
+                  </div>
+
+                </div>
+
+
+                {/* DRIVER ASSESSMENT */}
+
+                <div className="feedback-group">
+
+                  <span className="feedback-label">
+                    DRIVER ASSESSMENT
+                  </span>
+
+                  <div className="feedback-options">
+
+                    <button
+                      type="button"
+                      className={`feedback-option ${
+                        feedbackDriver === "SUPPORTED"
+                          ? "selected"
+                          : ""
+                      }`}
+                      onClick={() =>
+                        setFeedbackDriver("SUPPORTED")
+                      }
+                    >
+                      Supported
+                    </button>
+
+                    <button
+                      type="button"
+                      className={`feedback-option ${
+                        feedbackDriver ===
+                        "PARTIALLY_SUPPORTED"
+                          ? "selected"
+                          : ""
+                      }`}
+                      onClick={() =>
+                        setFeedbackDriver(
+                          "PARTIALLY_SUPPORTED"
+                        )
+                      }
+                    >
+                      Partially supported
+                    </button>
+
+                    <button
+                      type="button"
+                      className={`feedback-option ${
+                        feedbackDriver === "NOT_SUPPORTED"
+                          ? "selected"
+                          : ""
+                      }`}
+                      onClick={() =>
+                        setFeedbackDriver(
+                          "NOT_SUPPORTED"
+                        )
+                      }
+                    >
+                      Not supported
+                    </button>
+
+                  </div>
+
+                </div>
+
+
+                {/* COMMENT */}
+
+                <div className="feedback-group">
+
+                  <span className="feedback-label">
+                    OPTIONAL ANALYST NOTE
+                  </span>
+
+                  <textarea
+                    className="feedback-textarea"
+                    value={feedbackComment}
+                    onChange={(e) =>
+                      setFeedbackComment(
+                        e.target.value
+                      )
+                    }
+                    placeholder="Add context for the next investigation..."
+                    rows={3}
+                  />
+
+                </div>
+
+
+                {/* SUBMIT */}
+
+                <div className="feedback-actions">
+
+                  <button
+                    type="button"
+                    className="feedback-submit"
+                    disabled={
+                      !feedbackUsefulness ||
+                      !feedbackDriver ||
+                      feedbackLoading
+                    }
+                    onClick={submitFeedback}
+                  >
+                    {feedbackLoading
+                      ? "RECORDING..."
+                      : "SUBMIT FEEDBACK"}
+                  </button>
+
+                </div>
+
+              </div>
+
+            ) : (
+
+              <div className="feedback-success">
+
+                <div className="feedback-success-icon">
+                  ✓
+                </div>
+
+                <div>
+
+                  <strong>
+                    Feedback recorded
+                  </strong>
+
+                  <p>
+                    Analyst input has been captured for this
+                    investigation and can be used for future
+                    calibration.
+                  </p>
+
+                </div>
+
+              </div>
+
+            )}
+
+          </section>
+
+          )}
+
 
         {/* INVESTIGATION FLOW */}
 
-        <section className="section">
+        {isAbstained ? (
+
+        <section className="section abstention-section">
 
           <div className="section-heading">
             <div>
               <span className="eyebrow">
-                INVESTIGATION FLOW
+                INVESTIGATION DECISION
               </span>
 
               <h2>
-                From signal to action
+                The engine stopped before attribution.
               </h2>
             </div>
           </div>
 
 
-          <div className="investigation-flow">
+          <div className="abstention-detail-grid">
 
-            <div className="flow-node">
-              <span>01</span>
-              <strong>Signal</strong>
+            <div className="abstention-detail-card">
+
+              <span className="outcome-label">
+                01 · WHY WE ABSTAINED
+              </span>
+
+              <h3>
+                The available history is not sufficient.
+              </h3>
+
               <p>
-                {investigation.signals.revenue_declined &&
-                investigation.signals.inventory_declined
-                  ? "Revenue and inventory declined"
-                  : investigation.signals.inventory_declined
-                  ? "Inventory declined"
-                  : investigation.signals.revenue_declined
-                  ? "Revenue declined"
-                  : "No major decline detected"}
+                The engine detected a business signal, but there
+                are not enough historical observations to determine
+                whether the change is genuinely unusual or identify
+                a reliable underlying driver.
               </p>
+
             </div>
 
-            <div className="flow-line">
-              <div className="flow-line-pulse" />
+
+            <div className="abstention-detail-card">
+
+              <span className="outcome-label">
+                02 · WHAT IS MISSING
+              </span>
+
+              <div className="abstention-list">
+
+                <div>
+                  <span>01</span>
+                  <p>
+                    Additional historical observations
+                  </p>
+                </div>
+
+                <div>
+                  <span>02</span>
+                  <p>
+                    Relevant operational or business context
+                  </p>
+                </div>
+
+                <div>
+                  <span>03</span>
+                  <p>
+                    Evidence that can validate the suspected driver
+                  </p>
+                </div>
+
+              </div>
+
             </div>
 
-            <div className="flow-node">
-              <span>02</span>
-              <strong>Evidence</strong>
+
+            <div className="abstention-detail-card">
+
+              <span className="outcome-label">
+                03 · NEXT STEP
+              </span>
+
+              <h3>
+                Collect evidence and re-run the investigation.
+              </h3>
+
               <p>
-                {investigation.key_metrics.inventory.status ===
-                "RAPID_STOCK_DECLINE"
-                  ? "Inventory movement is statistically extreme"
-                  : "Inventory movement requires review"}
+                No causal attribution is produced until the evidence
+                threshold is met.
               </p>
-            </div>
 
-            <div className="flow-line">
-              <div className="flow-line-pulse" />
-            </div>
-
-            <div className="flow-node">
-              <span>03</span>
-              <strong>Hypothesis</strong>
-              <p>{investigation.hypothesis.statement}</p>
-            </div>
-
-            <div className="flow-line">
-              <div className="flow-line-pulse" />
-            </div>
-
-            <div className="flow-node">
-              <span>04</span>
-              <strong>Action</strong>
-              <p>{investigation.recommendation.action}</p>
             </div>
 
           </div>
 
         </section>
+
+      ) : (
+
+        <section className="section">
+
+          <section className="section">
+
+                <div className="section-heading">
+                  <div>
+                    <span className="eyebrow">
+                      INVESTIGATION FLOW
+                    </span>
+
+                    <h2>
+                      From signal to action
+                    </h2>
+                  </div>
+                </div>
+
+
+                <div className="investigation-flow">
+
+                  <div className="flow-node">
+                    <span>01</span>
+                    <strong>Signal</strong>
+                    <p>
+                      {investigation.signals.revenue_declined &&
+                      investigation.signals.inventory_declined
+                        ? "Revenue and inventory declined"
+                        : investigation.signals.inventory_declined
+                        ? "Inventory declined"
+                        : investigation.signals.revenue_declined
+                        ? "Revenue declined"
+                        : "No major decline detected"}
+                    </p>
+                  </div>
+
+                  <div className="flow-line">
+                    <div className="flow-line-pulse" />
+                  </div>
+
+                  <div className="flow-node">
+                    <span>02</span>
+                    <strong>Evidence</strong>
+                    <p>
+                      {investigation.key_metrics.inventory.status ===
+                      "RAPID_STOCK_DECLINE"
+                        ? "Inventory movement is statistically extreme"
+                        : "Inventory movement requires review"}
+                    </p>
+                  </div>
+
+                  <div className="flow-line">
+                    <div className="flow-line-pulse" />
+                  </div>
+
+                  <div className="flow-node">
+                    <span>03</span>
+                    <strong>Hypothesis</strong>
+                    <p>{investigation.hypothesis.statement}</p>
+                  </div>
+
+                  <div className="flow-line">
+                    <div className="flow-line-pulse" />
+                  </div>
+
+                  <div className="flow-node">
+                    <span>04</span>
+                    <strong>Action</strong>
+                    <p>{investigation.recommendation.action}</p>
+                  </div>
+
+                </div>
+
+              </section>
+
+        </section>
+
+      )}
+
 
 
         {/* EVIDENCE + HYPOTHESIS */}
 
-        <section className="analysis-grid">
+        {!isAbstained && (
+          <section className="analysis-grid">
 
-          <div className="panel">
-            <div className="panel-header">
-              <div>
-                <span className="eyebrow">
-                  STATISTICAL EVIDENCE
-                </span>
-
-                <h2>Why this case matters</h2>
-              </div>
-
-              <span className="signal-badge">
-                {signals.dominant_signal}
-              </span>
-            </div>
-
-            <div className="evidence-row">
-
-              <div className="evidence-metric">
-
-                <div className="evidence-metric-header">
-                  <span>Inventory movement</span>
-
-                  <strong>
-                    {key_metrics.inventory.stock_change_pct}%
-                  </strong>
-                </div>
-
-                <div className="evidence-bar">
-                  <div
-                    className="evidence-bar-fill"
-                    style={{
-                      width: `${(inventoryMovement / maxMovement) * 100}%`
-                    }}
-                  />
-                </div>
-
-              </div>
-
-              <span className="extreme">
-                {key_metrics.inventory.status ===
-                "RAPID_STOCK_DECLINE"
-                  ? "EXTREME"
-                  : "REVIEW"}
-              </span>
-
-            </div>
-
-            <div className="evidence-row">
-              <div>
-                <span>Inventory z-score</span>
-                <strong>
-                  {key_metrics.inventory.z_score.toFixed(2)}
-                </strong>
-              </div>
-
-              <span className="extreme">
-                STATISTICAL SIGNAL
-              </span>
-            </div>
-
-            <div className="evidence-row">
-
-              <div className="evidence-metric">
-
-                <div className="evidence-metric-header">
-                  <span>Revenue deviation</span>
-
-                  <strong>
-                    {key_metrics.revenue.deviation_pct}%
-                  </strong>
-                </div>
-
-                <div className="evidence-bar">
-                  <div
-                    className="evidence-bar-fill"
-                    style={{
-                      width: `${(revenueMovement / maxMovement) * 100}%`
-                    }}
-                  />
-                </div>
-
-              </div>
-
-              <span className="normal">
-                {Math.abs(key_metrics.revenue.z_score) >= 2
-                  ? "ANOMALOUS"
-                  : "NORMAL"}
-              </span>
-
-            </div>
-
-            <div className="timeline-chart">
-
-              <div className="timeline-chart-header">
+            <div className="panel">
+              <div className="panel-header">
                 <div>
-                  <span className="chart-label">
-                    PERFORMANCE TRAJECTORY
+                  <span className="eyebrow">
+                    STATISTICAL EVIDENCE
                   </span>
 
-                  <strong>
-                    Historical signal movement
-                  </strong>
+                  <h2>Why this case matters</h2>
                 </div>
-              </div>
 
-              <div
-                className="chart-container"
-                style={{
-                  width: "100%",
-                  height: "280px",
-                  minHeight: "280px",
-                }}
-              >
-
-                {chartData.length > 0 ? (
-                  <ResponsiveContainer
-                    width="100%"
-                    height="100%"
-                  >
-
-                    <LineChart
-                      data={chartData}
-                      margin={{
-                        top: 10,
-                        right: 10,
-                        left: -20,
-                        bottom: 5,
-                      }}
-                    >
-                      <CartesianGrid
-                        strokeDasharray="3 5"
-                        vertical={false}
-                        stroke="#252936"
-                      />
-
-                      <XAxis
-                        dataKey="month"
-                        tick={{
-                          fill: "#7f8798",
-                          fontSize: 10,
-                        }}
-                        axisLine={false}
-                        tickLine={false}
-                      />
-
-                      <YAxis
-                        domain={[-70, 35]}
-                        tick={{
-                          fill: "#7f8798",
-                          fontSize: 10,
-                        }}
-                        tickFormatter={(value) => `${value}%`}
-                        axisLine={false}
-                        tickLine={false}
-                      />
-
-                      <ReferenceLine
-                        y={0}
-                        stroke="#596170"
-                        strokeDasharray="4 4"
-                      />
-
-                      <Tooltip
-                        contentStyle={{
-                          background: "#11141b",
-                          border: "1px solid #2b3040",
-                          borderRadius: "8px",
-                          fontSize: "12px",
-                        }}
-                        labelStyle={{
-                          color: "#ffffff",
-                          marginBottom: "4px",
-                        }}
-                        formatter={(value, name) => [
-                          `${Number(value).toFixed(2)}%`,
-                          name === "revenue" ? "Revenue" : "Inventory",
-                        ]}
-                      />
-
-                      <Legend
-                        verticalAlign="top"
-                        align="right"
-                        iconType="circle"
-                        wrapperStyle={{
-                          fontSize: "11px",
-                          paddingBottom: "12px",
-                        }}
-                        formatter={(value) =>
-                          value === "revenue"
-                            ? "Revenue"
-                            : "Inventory"
-                        }
-                      />
-
-                      <Line
-                        type="monotone"
-                        dataKey="revenue"
-                        stroke="#f1f3f7"
-                        strokeWidth={2}
-                        dot={{
-                          r: 3,
-                          fill: "#f1f3f7",
-                          strokeWidth: 0,
-                        }}
-                        activeDot={{
-                          r: 5,
-                        }}
-                      />
-
-                      <Line
-                        type="monotone"
-                        dataKey="inventory"
-                        stroke="#737b8c"
-                        strokeWidth={2}
-                        dot={{
-                          r: 3,
-                          fill: "#737b8c",
-                          strokeWidth: 0,
-                        }}
-                        activeDot={{
-                          r: 5,
-                        }}
-                      />
-
-                      {chartData
-                        .filter((item) => item.isInvestigationMonth)
-                        .map((item) => (
-                          <ReferenceDot
-                            key={`investigation-${item.month}`}
-                            x={item.month}
-                            y={item.inventory}
-                            r={6}
-                            fill="#ffffff"
-                            stroke="#101219"
-                            strokeWidth={2}
-                          />
-                        ))}
-
-                      {chartData
-                        .filter((item) => item.isInvestigationMonth)
-                        .map((item) => (
-                          <ReferenceLine
-                            key={`investigation-line-${item.month}`}
-                            x={item.month}
-                            stroke="#596170"
-                            strokeDasharray="4 4"
-                            label={{
-                              value: "INVESTIGATION MONTH",
-                              position: "insideTop",
-                              fill: "#9aa2b1",
-                              fontSize: 9,
-                              fontWeight: 600,
-                            }}
-                          />
-                        ))}
-                    </LineChart>
-
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="chart-empty">
-                    Historical data unavailable.
-                  </div>
-                )}
-
-              </div>
-
-            </div>
-
-            <div className="evidence-divider" />
-
-            <div className="evidence-summary">
-
-              <div className="summary-icon">
-                →
-              </div>
-
-              <div>
-                <span>Dominant business signal</span>
-
-                <strong>
+                <span className="signal-badge">
                   {signals.dominant_signal}
-                </strong>
-
-                <p>
-                  Both inventory and revenue declined during
-                  the case period, with inventory showing the
-                  strongest statistical movement.
-                </p>
+                </span>
               </div>
 
-            </div>
+              <div className="evidence-row">
 
-          </div>
+                <div className="evidence-metric">
 
+                  <div className="evidence-metric-header">
+                    <span>Inventory movement</span>
 
-          <div className="panel hypothesis-panel">
-
-            <div className="hypothesis-panel-header">
-              <div>
-                <span className="eyebrow">
-                  AI INVESTIGATION HYPOTHESIS
-                </span>
-
-                <h2>
-                  {hypothesis.type}
-                </h2>
-              </div>
-
-              <span className="hypothesis-badge">
-                EVIDENCE GROUNDED
-              </span>
-            </div>
-
-            <blockquote>
-              “{hypothesis.statement}”
-            </blockquote>
-
-            <div className="hypothesis-insights">
-
-              <div className="hypothesis-insight">
-                <span className="insight-label">
-                  WHAT WE OBSERVED
-                </span>
-
-                <div className="insight-values">
-
-                  <div>
                     <strong>
                       {key_metrics.inventory.stock_change_pct}%
                     </strong>
-
-                    <span>
-                      Inventory movement
-                    </span>
                   </div>
 
-                  <div>
-                    <strong>
-                      {key_metrics.revenue.deviation_pct}%
-                    </strong>
-
-                    <span>
-                      Revenue deviation
-                    </span>
-                  </div>
-
-                  <div>
-                    <strong>
-                      {key_metrics.inventory.z_score.toFixed(2)}
-                    </strong>
-
-                    <span>
-                      Inventory z-score
-                    </span>
+                  <div className="evidence-bar">
+                    <div
+                      className="evidence-bar-fill"
+                      style={{
+                        width: `${(inventoryMovement / maxMovement) * 100}%`
+                      }}
+                    />
                   </div>
 
                 </div>
-              </div>
 
-
-              <div className="hypothesis-insight">
-
-                <span className="insight-label">
-                  WHAT THIS SUGGESTS
+                <span className="extreme">
+                  {key_metrics.inventory.status ===
+                  "RAPID_STOCK_DECLINE"
+                    ? "EXTREME"
+                    : "REVIEW"}
                 </span>
-
-                <p>
-                  The observed inventory decline is a plausible
-                  signal associated with the revenue decline during
-                  the investigation period.
-                </p>
 
               </div>
 
+              <div className="evidence-row">
+                <div>
+                  <span>Inventory z-score</span>
+                  <strong>
+                    {key_metrics.inventory.z_score !== null
+                      ? key_metrics.inventory.z_score.toFixed(2)
+                      : "N/A"}
+                  </strong>
+                </div>
 
-              <div className="hypothesis-insight">
+                <span className="extreme">
+                  STATISTICAL SIGNAL
+                </span>
+              </div>
 
-                <span className="insight-label">
-                  WHAT REMAINS UNKNOWN
+              <div className="evidence-row">
+
+                <div className="evidence-metric">
+
+                  <div className="evidence-metric-header">
+                    <span>Revenue deviation</span>
+
+                    <strong>
+                      {key_metrics.revenue.deviation_pct}%
+                    </strong>
+                  </div>
+
+                  <div className="evidence-bar">
+                    <div
+                      className="evidence-bar-fill"
+                      style={{
+                        width: `${(revenueMovement / maxMovement) * 100}%`
+                      }}
+                    />
+                  </div>
+
+                </div>
+
+                <span className="normal">
+                  {key_metrics.revenue.z_score !== null &&
+                  Math.abs(key_metrics.revenue.z_score) >= 2
+                    ? "ANOMALOUS"
+                    : "NORMAL"}
                 </span>
 
-                <p>
-                  The available evidence does not establish whether
-                  the inventory decline directly caused the revenue
-                  decline.
-                </p>
+              </div>
+
+              <div className="timeline-chart">
+
+                <div className="timeline-chart-header">
+                  <div>
+                    <span className="chart-label">
+                      PERFORMANCE TRAJECTORY
+                    </span>
+
+                    <strong>
+                      Historical signal movement
+                    </strong>
+                  </div>
+                </div>
+
+                <div
+                  className="chart-container"
+                  style={{
+                    width: "100%",
+                    height: "280px",
+                    minHeight: "280px",
+                  }}
+                >
+
+                  {chartData.length > 0 ? (
+                    <ResponsiveContainer
+                      width="100%"
+                      height="100%"
+                    >
+
+                      <LineChart
+                        data={chartData}
+                        margin={{
+                          top: 10,
+                          right: 10,
+                          left: -20,
+                          bottom: 5,
+                        }}
+                      >
+                        <CartesianGrid
+                          strokeDasharray="3 5"
+                          vertical={false}
+                          stroke="#252936"
+                        />
+
+                        <XAxis
+                          dataKey="month"
+                          tick={{
+                            fill: "#7f8798",
+                            fontSize: 10,
+                          }}
+                          axisLine={false}
+                          tickLine={false}
+                        />
+
+                        <YAxis
+                          domain={[-70, 35]}
+                          tick={{
+                            fill: "#7f8798",
+                            fontSize: 10,
+                          }}
+                          tickFormatter={(value) => `${value}%`}
+                          axisLine={false}
+                          tickLine={false}
+                        />
+
+                        <ReferenceLine
+                          y={0}
+                          stroke="#596170"
+                          strokeDasharray="4 4"
+                        />
+
+                        <Tooltip
+                          contentStyle={{
+                            background: "#11141b",
+                            border: "1px solid #2b3040",
+                            borderRadius: "8px",
+                            fontSize: "12px",
+                          }}
+                          labelStyle={{
+                            color: "#ffffff",
+                            marginBottom: "4px",
+                          }}
+                          formatter={(value, name) => [
+                            `${Number(value).toFixed(2)}%`,
+                            name === "revenue" ? "Revenue" : "Inventory",
+                          ]}
+                        />
+
+                        <Legend
+                          verticalAlign="top"
+                          align="right"
+                          iconType="circle"
+                          wrapperStyle={{
+                            fontSize: "11px",
+                            paddingBottom: "12px",
+                          }}
+                          formatter={(value) =>
+                            value === "revenue"
+                              ? "Revenue"
+                              : "Inventory"
+                          }
+                        />
+
+                        <Line
+                          type="monotone"
+                          dataKey="revenue"
+                          stroke="#f1f3f7"
+                          strokeWidth={2}
+                          dot={{
+                            r: 3,
+                            fill: "#f1f3f7",
+                            strokeWidth: 0,
+                          }}
+                          activeDot={{
+                            r: 5,
+                          }}
+                        />
+
+                        <Line
+                          type="monotone"
+                          dataKey="inventory"
+                          stroke="#737b8c"
+                          strokeWidth={2}
+                          dot={{
+                            r: 3,
+                            fill: "#737b8c",
+                            strokeWidth: 0,
+                          }}
+                          activeDot={{
+                            r: 5,
+                          }}
+                        />
+
+                        {chartData
+                          .filter((item) => item.isInvestigationMonth)
+                          .map((item) => (
+                            <ReferenceDot
+                              key={`investigation-${item.month}`}
+                              x={item.month}
+                              y={item.inventory}
+                              r={6}
+                              fill="#ffffff"
+                              stroke="#101219"
+                              strokeWidth={2}
+                            />
+                          ))}
+
+                        {chartData
+                          .filter((item) => item.isInvestigationMonth)
+                          .map((item) => (
+                            <ReferenceLine
+                              key={`investigation-line-${item.month}`}
+                              x={item.month}
+                              stroke="#596170"
+                              strokeDasharray="4 4"
+                              label={{
+                                value: "INVESTIGATION MONTH",
+                                position: "insideTop",
+                                fill: "#9aa2b1",
+                                fontSize: 9,
+                                fontWeight: 600,
+                              }}
+                            />
+                          ))}
+                      </LineChart>
+
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="chart-empty">
+                      Historical data unavailable.
+                    </div>
+                  )}
+
+                </div>
+
+              </div>
+
+              <div className="evidence-divider" />
+
+              <div className="evidence-summary">
+
+                <div className="summary-icon">
+                  →
+                </div>
+
+                <div>
+                  <span>Dominant business signal</span>
+
+                  <strong>
+                    {signals.dominant_signal}
+                  </strong>
+
+                  <p>
+                    Both inventory and revenue declined during
+                    the case period, with inventory showing the
+                    strongest statistical movement.
+                  </p>
+                </div>
 
               </div>
 
             </div>
 
 
-            <div className="hypothesis-note">
+            <div className="panel hypothesis-panel">
 
-              <span className="note-icon">
-                !
-              </span>
+              <div className="hypothesis-panel-header">
+                <div>
+                  <span className="eyebrow">
+                    AI INVESTIGATION HYPOTHESIS
+                  </span>
 
-              <p>
-                This is an evidence-grounded hypothesis.
-                The available evidence does not establish
-                causation.
-              </p>
+                  <h2>
+                    {hypothesis.type}
+                  </h2>
+                </div>
+
+                <span className="hypothesis-badge">
+                  {isAbstained
+                    ? "NO ATTRIBUTION"
+                    : evidence_sufficiency.status === "LIMITED"
+                    ? "LIMITED EVIDENCE"
+                    : "EVIDENCE GROUNDED"}
+                </span>
+              </div>
+
+              <blockquote>
+                “{hypothesis.statement}”
+              </blockquote>
+
+              <div className="hypothesis-insights">
+
+                <div className="hypothesis-insight">
+                  <span className="insight-label">
+                    WHAT WE OBSERVED
+                  </span>
+
+                  <div className="insight-values">
+
+                    <div>
+                      <strong>
+                        {key_metrics.inventory.stock_change_pct}%
+                      </strong>
+
+                      <span>
+                        Inventory movement
+                      </span>
+                    </div>
+
+                    <div>
+                      <strong>
+                        {key_metrics.revenue.deviation_pct}%
+                      </strong>
+
+                      <span>
+                        Revenue deviation
+                      </span>
+                    </div>
+
+                    <div>
+                      <strong>
+                        {key_metrics.inventory.z_score !== null
+                          ? key_metrics.inventory.z_score.toFixed(2)
+                          : "N/A"}
+                      </strong>
+
+                      <span>
+                        Inventory z-score
+                      </span>
+                    </div>
+
+                  </div>
+                </div>
+
+
+                <div className="hypothesis-insight">
+
+                  <span className="insight-label">
+                    WHAT THIS SUGGESTS
+                  </span>
+
+                  <p>
+                    The observed inventory decline is a plausible
+                    signal associated with the revenue decline during
+                    the investigation period.
+                  </p>
+
+                </div>
+
+
+                <div className="hypothesis-insight">
+
+                  <span className="insight-label">
+                    WHAT REMAINS UNKNOWN
+                  </span>
+
+                  <p>
+                    The available evidence does not establish whether
+                    the inventory decline directly caused the revenue
+                    decline.
+                  </p>
+
+                </div>
+
+              </div>
+
+
+              <div className="hypothesis-note">
+
+                <span className="note-icon">
+                  !
+                </span>
+
+                <p>
+                  This is an evidence-grounded hypothesis.
+                  The available evidence does not establish
+                  causation.
+                </p>
+
+              </div>
 
             </div>
 
-          </div>
-
-        </section>
+          </section>
+        )}
 
 
         {/* CONFIDENCE */}
 
+          {!isAbstained && (
           <section className="confidence-section">
 
             <div className="confidence-copy">
@@ -1236,14 +2686,11 @@ function App() {
               </span>
 
               <h2>
-                Evidence supports the investigation,
-                but uncertainty remains.
+                {currentScenarioContent.confidenceTitle}
               </h2>
 
               <p className="confidence-description">
-                The confidence score reflects the balance between
-                evidence supporting the hypothesis and factors that
-                weaken the investigation.
+                {personaContent.confidenceDescription}
               </p>
 
             </div>
@@ -1376,132 +2823,137 @@ function App() {
             </div>
 
           </section>
+          )}
 
 
         {/* RECOMMENDATION */}
 
-        <section className="recommendation-section">
+        {!isAbstained && (
+          <section className="recommendation-section">
 
-          <div className="recommendation-header">
+            <div className="recommendation-header">
 
-            <div>
-              <span className="eyebrow">
-                RECOMMENDED ACTION
-              </span>
+              <div>
+                <span className="eyebrow">
+                  RECOMMENDED ACTION
+                </span>
 
-              <h2>
-                Validate the inventory signal
-              </h2>
+                <h2>
+                  {isExecutive
+                    ? "Validate the inventory signal"
+                    : "Trace the inventory movement"}
+                </h2>
 
-              <p className="recommendation-lead">
-                Before attributing revenue impact to inventory changes,
-                validate the operational evidence behind the signal.
-              </p>
+                <p className="recommendation-lead">
+                  {isExecutive
+                    ? "Before attributing revenue impact to inventory changes, validate the operational evidence behind the signal."
+                    : "Review the inventory trail and replenishment activity before escalating the finding."}
+                </p>
+              </div>
+
+              <div className="urgency-badge">
+                {investigation.recommendation.urgency}
+              </div>
+
             </div>
 
-            <div className="urgency-badge">
-              {investigation.recommendation.urgency}
-            </div>
+            <div className="recommendation-body">
 
-          </div>
+              <div className="recommendation-reason">
 
-          <div className="recommendation-body">
+                <span className="eyebrow">
+                  WHY THIS ACTION
+                </span>
 
-            <div className="recommendation-reason">
+                <div className="reason-list">
 
-              <span className="eyebrow">
-                WHY THIS ACTION
-              </span>
+                  {investigation.recommendation.reason.map(
+                    (reason, index) => (
+                      <div
+                        className="reason-item"
+                        key={index}
+                      >
+                        <span className="reason-number">
+                          {String(index + 1).padStart(2, "0")}
+                        </span>
 
-              <div className="reason-list">
+                        <p>{reason}</p>
+                      </div>
+                    )
+                  )}
 
-                {investigation.recommendation.reason.map(
-                  (reason, index) => (
-                    <div
-                      className="reason-item"
-                      key={index}
-                    >
-                      <span className="reason-number">
-                        {String(index + 1).padStart(2, "0")}
-                      </span>
+                </div>
 
-                      <p>{reason}</p>
-                    </div>
-                  )
-                )}
+              </div>
+
+
+              <div className="recommendation-next">
+
+                <span className="eyebrow">
+                  NEXT STEPS
+                </span>
+
+                <div className="next-step-list">
+
+                  <div className="next-step">
+                    <span>01</span>
+                    <p>Review inventory movement records.</p>
+                  </div>
+
+                  <div className="next-step">
+                    <span>02</span>
+                    <p>
+                      Compare replenishment timing and quantities
+                      against expected patterns.
+                    </p>
+                  </div>
+
+                  <div className="next-step">
+                    <span>03</span>
+                    <p>
+                      Check whether the observed stock reduction
+                      was operationally expected.
+                    </p>
+                  </div>
+
+                </div>
 
               </div>
 
             </div>
 
 
-            <div className="recommendation-next">
+            <div className="decision-status">
 
-              <span className="eyebrow">
-                NEXT STEPS
-              </span>
+              <span className="decision-dot" />
 
-              <div className="next-step-list">
+              <div>
+                <strong>
+                  {personaContent.decisionStatus}
+                </strong>
 
-                <div className="next-step">
-                  <span>01</span>
-                  <p>Review inventory movement records.</p>
-                </div>
-
-                <div className="next-step">
-                  <span>02</span>
-                  <p>
-                    Compare replenishment timing and quantities
-                    against expected patterns.
-                  </p>
-                </div>
-
-                <div className="next-step">
-                  <span>03</span>
-                  <p>
-                    Check whether the observed stock reduction
-                    was operationally expected.
-                  </p>
-                </div>
-
+                <p>
+                  {personaContent.decisionDescription}
+                </p>
               </div>
 
             </div>
 
-          </div>
 
+            {investigation.recommendation.causal_warning && (
+              <div className="causal-warning">
 
-          <div className="decision-status">
+                <span>CAUTION</span>
 
-            <span className="decision-dot" />
+                <p>
+                  {investigation.recommendation.causal_warning}
+                </p>
 
-            <div>
-              <strong>
-                Investigation ready for action
-              </strong>
+              </div>
+            )}
 
-              <p>
-                The available evidence supports operational
-                review, while causation remains unconfirmed.
-              </p>
-            </div>
-
-          </div>
-
-
-          {investigation.recommendation.causal_warning && (
-            <div className="causal-warning">
-
-              <span>CAUTION</span>
-
-              <p>
-                {investigation.recommendation.causal_warning}
-              </p>
-
-            </div>
-          )}
-
-        </section>
+          </section>
+        )}
 
         {/* EXECUTIVE BUSINESS SUMMARY */}
 
@@ -1515,17 +2967,22 @@ function App() {
             </span>
 
             <h2>
-              What the investigation tells us
+              {isExecutive
+                ? "What leadership should know"
+                : "What the investigation found"}
             </h2>
 
             <p>
-              A concise business interpretation of the
-              evidence, hypothesis and recommended action.
+              {isExecutive
+                ? "A decision-oriented interpretation of the evidence, risk and recommended action."
+                : "A diagnostic interpretation of the evidence, hypothesis and operational next steps."}
             </p>
           </div>
 
           <div className="summary-status">
-            <span>INVESTIGATION COMPLETE</span>
+            <span>
+              {currentScenarioContent.summaryStatus}
+            </span>
           </div>
 
         </div>
@@ -1572,7 +3029,9 @@ function App() {
                 <li>
                   <span>Inventory deviation</span>
                   <strong>
-                    {key_metrics.inventory.z_score.toFixed(2)}
+                    {key_metrics.inventory.z_score !== null
+                      ? key_metrics.inventory.z_score.toFixed(2)
+                      : "N/A"}
                   </strong>
                   <small>
                     Z-score · {key_metrics.inventory.status}
