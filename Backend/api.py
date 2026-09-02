@@ -1,7 +1,22 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from sqlalchemy import text
+from typing import Optional
 
 from Backend.investigation import run_investigation
+from Backend.database import get_engine
+
+class FeedbackRequest(BaseModel):
+    case_month: str
+    region: str
+    product_category: str
+    warehouse: Optional[str] = None
+
+    usefulness: str
+    driver_assessment: str
+
+    comment: Optional[str] = None
 
 
 app = FastAPI(
@@ -38,6 +53,9 @@ def investigation(scenario: str = "priority"):
         elif scenario == "limited":
             result = run_investigation(scenario="limited")
 
+        elif scenario == "sparse":
+            result = run_investigation(scenario="sparse")
+
         else:
             result = run_investigation()
 
@@ -53,6 +71,29 @@ def investigation(scenario: str = "priority"):
         hybrid = result["hybrid"]
         confidence = result["confidence"]
         recommendation = result["recommendation"]
+
+        driver_decomposition = result.get(
+            "driver_decomposition"
+        )
+
+        evidence_lineage = result.get(
+            "evidence_lineage",
+            []
+        )
+
+        runtime_telemetry = result.get(
+            "runtime_telemetry",
+            {
+                "total_runtime_ms": 0,
+                "analytics_runtime_ms": 0,
+                "hypothesis_llm_runtime_ms": 0,
+                "summary_llm_runtime_ms": 0,
+                "llm_runtime_ms": 0,
+                "llm_used": False,
+                "decision_path": "UNKNOWN",
+                "evidence_sources": 0,
+            }
+        )
 
         evidence_sufficiency = result.get(
             "evidence_sufficiency",
@@ -100,7 +141,9 @@ def investigation(scenario: str = "priority"):
                 for row in result["history"]
             ],
 
-            "evidence_sufficiency": evidence_sufficiency,       
+            "evidence_sufficiency": evidence_sufficiency,
+
+            "runtime_telemetry": runtime_telemetry,       
 
             "priority": {
                 "score": case["priority_score"],
@@ -165,6 +208,10 @@ def investigation(scenario: str = "priority"):
                 )
             },
 
+            "driver_decomposition": driver_decomposition,
+
+            "evidence_lineage": evidence_lineage,
+
             "hypothesis": result[
                 "selected_hypothesis"
             ],
@@ -195,7 +242,93 @@ def investigation(scenario: str = "priority"):
         raise
 
     except Exception as e:
+        import traceback
+
+        traceback.print_exc()
+
         raise HTTPException(
             status_code=500,
             detail=str(e)
+        )
+
+
+@app.post("/feedback")
+def submit_feedback(feedback: FeedbackRequest):
+
+    allowed_usefulness = {
+        "USEFUL",
+        "NOT_USEFUL",
+    }
+
+    allowed_driver_assessments = {
+        "SUPPORTED",
+        "PARTIALLY_SUPPORTED",
+        "NOT_SUPPORTED",
+    }
+
+    if feedback.usefulness not in allowed_usefulness:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid usefulness value.",
+        )
+
+    if feedback.driver_assessment not in allowed_driver_assessments:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid driver assessment value.",
+        )
+
+    try:
+
+        with get_engine().begin() as connection:
+
+            result = connection.execute(
+                text("""
+                    INSERT INTO analyst_feedback (
+                        case_month,
+                        region,
+                        product_category,
+                        warehouse,
+                        usefulness,
+                        driver_assessment,
+                        comment
+                    )
+                    VALUES (
+                        :case_month,
+                        :region,
+                        :product_category,
+                        :warehouse,
+                        :usefulness,
+                        :driver_assessment,
+                        :comment
+                    )
+                    RETURNING
+                        feedback_id,
+                        created_at
+                """),
+                {
+                    "case_month": feedback.case_month,
+                    "region": feedback.region,
+                    "product_category": feedback.product_category,
+                    "warehouse": feedback.warehouse,
+                    "usefulness": feedback.usefulness,
+                    "driver_assessment": feedback.driver_assessment,
+                    "comment": feedback.comment,
+                },
+            )
+
+            row = result.fetchone()
+
+        return {
+            "status": "SUCCESS",
+            "message": "Analyst feedback recorded.",
+            "feedback_id": row.feedback_id,
+            "created_at": row.created_at,
+        }
+
+    except Exception as e:
+
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to save feedback: {str(e)}",
         )

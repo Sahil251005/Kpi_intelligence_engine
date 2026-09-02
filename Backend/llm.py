@@ -5,7 +5,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 from groq import Groq
 from groq import RateLimitError
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 
 class Hypothesis(BaseModel):
@@ -134,7 +134,14 @@ many speculative hypotheses.
         result = response.choices[0].message.content
 
         if result and result.strip():
-            return HypothesisResponse.model_validate_json(result)
+            try:
+                return HypothesisResponse.model_validate_json(result)
+
+            except ValidationError as validation_error:
+                print(
+                    "WARNING: LLM returned invalid hypothesis structure."
+                )
+                print(validation_error) 
 
     except RateLimitError:
         print(

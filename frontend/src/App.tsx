@@ -16,7 +16,8 @@ import "./App.css";
 type InvestigationScenario =
   | "priority"
   | "limited"
-  | "insufficient";
+  | "insufficient"
+  | "sparse";
 
 type HistoryRecord = {
   month: string;
@@ -36,6 +37,70 @@ type HistoryRecord = {
 
 type Persona = "EXECUTIVE" | "OPERATIONS";
 
+type DriverDecomposition = {
+  baseline_months: number;
+  baseline_source: "OWN_HISTORY" | "PEER_CONTEXT";
+
+  baseline_revenue: number | null;
+  target_revenue: number | null;
+
+  revenue_change: number | null;
+  revenue_change_pct: number | null;
+
+  baseline_orders: number | null;
+  target_orders: number | null;
+
+  baseline_aov: number | null;
+  target_aov: number | null;
+
+  drivers: {
+    driver: string;
+    metric: string;
+    baseline: number;
+    target: number;
+    change: number;
+    contribution: number;
+    contribution_pct: number;
+    direction: string;
+    rank: number;
+  }[];
+
+  inventory_signal: {
+    driver: string;
+    baseline: number;
+    target: number;
+    change: number;
+    direction: string;
+    role: string;
+  } | null;
+
+  peer_context?: {
+    peer_months: number;
+    peer_categories: number;
+    description: string;
+  };
+};
+
+type EvidenceLineage = {
+  source: string;
+  dataset: string;
+  method: string;
+  freshness: string;
+  contribution: "PRIMARY" | "SUPPORTING" | "INTERPRETATION";
+  confidence: number;
+};
+
+type RuntimeTelemetry = {
+    total_runtime_ms: number;
+    analytics_runtime_ms: number;
+    hypothesis_llm_runtime_ms: number;
+    summary_llm_runtime_ms: number;
+    llm_runtime_ms: number;
+    llm_used: boolean;
+    decision_path: string;
+    evidence_sources: number;
+  };
+
 type Investigation = {
   case: {
     month: string;
@@ -52,6 +117,12 @@ type Investigation = {
   };
 
   history: HistoryRecord[];
+
+  driver_decomposition: DriverDecomposition | null;
+
+  evidence_lineage: EvidenceLineage[];
+
+  runtime_telemetry: RuntimeTelemetry;
 
   priority: {
     score: number;
@@ -169,6 +240,26 @@ function App() {
   const [scenario, setScenario] =
     useState<InvestigationScenario>("priority");
 
+  const [feedbackUsefulness, setFeedbackUsefulness] =
+    useState<"USEFUL" | "NOT_USEFUL" | "">("");
+
+  const [feedbackDriver, setFeedbackDriver] =
+    useState<
+      "SUPPORTED" |
+      "PARTIALLY_SUPPORTED" |
+      "NOT_SUPPORTED" |
+      ""
+    >("");
+
+  const [feedbackComment, setFeedbackComment] =
+    useState("");
+
+  const [feedbackSubmitted, setFeedbackSubmitted] =
+    useState(false);
+
+  const [feedbackLoading, setFeedbackLoading] =
+    useState(false);
+
   const [investigation, setInvestigation] =
     useState<Investigation | null>(null);
 
@@ -226,6 +317,74 @@ function App() {
     } finally {
       setLoading(false);
       setRunning(false);
+    }
+  };
+
+  const submitFeedback = async () => {
+
+    if (!investigation) {
+      return;
+    }
+
+    if (!feedbackUsefulness || !feedbackDriver) {
+      return;
+    }
+
+    setFeedbackLoading(true);
+
+    try {
+
+      const response = await fetch(
+        "http://127.0.0.1:8001/feedback",
+        {
+          method: "POST",
+
+          headers: {
+            "Content-Type": "application/json",
+          },
+
+          body: JSON.stringify({
+            case_month: investigation.case.month,
+
+            region: investigation.case.region,
+
+            product_category:
+              investigation.case.category,
+
+            warehouse:
+              investigation.case.warehouse,
+
+            usefulness:
+              feedbackUsefulness,
+
+            driver_assessment:
+              feedbackDriver,
+
+            comment:
+              feedbackComment.trim() || null,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          "Failed to submit feedback."
+        );
+      }
+
+      setFeedbackSubmitted(true);
+
+    } catch (error) {
+
+      console.error(
+        "Feedback submission failed:",
+        error
+      );
+
+    } finally {
+
+      setFeedbackLoading(false);
+
     }
   };
 
@@ -335,6 +494,22 @@ function App() {
       summaryStatus:
         "INVESTIGATION PAUSED",
     },
+
+      sparse: {
+      heroEyebrow: "SPARSE HISTORY",
+      heroDescription:
+        "A business signal has been detected, but the category has limited historical observations.",
+      outcomeTitle:
+        "The signal is visible, but category-specific attribution is constrained.",
+      outcomeDescription:
+        "Peer-category history is available as contextual benchmark evidence, but it is not used as a substitute baseline for revenue decomposition.",
+      hypothesisTitle:
+        "No category-specific driver assigned",
+      confidenceTitle:
+        "Confidence is deliberately low because the category has sparse own history.",
+      summaryStatus:
+        "LIMITED EVIDENCE",
+    },
   };
 
   const currentScenarioContent =
@@ -382,6 +557,9 @@ function App() {
     confidence,
     business_summary,
     evidence_sufficiency,
+    driver_decomposition,
+    evidence_lineage,  
+    runtime_telemetry,  
   } = investigation;
 
   const isAbstained =
@@ -547,6 +725,10 @@ function App() {
               <option value="insufficient">
                 Insufficient Evidence
               </option>
+
+              <option 
+              value="sparse">Sparse History
+              </option> 
             </select>
           </div>
 
@@ -1027,6 +1209,866 @@ function App() {
           </div>
 
         </section>
+
+        {/* DRIVER DECOMPOSITION */}
+
+        {driver_decomposition && !isAbstained && (
+
+          <section className="driver-section">
+
+            {/* SECTION HEADER */}
+
+            <div className="section-heading">
+
+              <div>
+                <span className="eyebrow">
+                  REVENUE DRIVER DECOMPOSITION
+                </span>
+
+                <h2>
+                  What contributed to the revenue movement?
+                </h2>
+              </div>
+
+              <div className="driver-revenue-change">
+
+                <span>
+                  REVENUE CHANGE
+                </span>
+
+                <strong>
+                  {driver_decomposition.revenue_change_pct !== null
+                  ? `${driver_decomposition.revenue_change_pct.toFixed(2)}%`
+                  : "—"}
+                </strong>
+
+                <small>
+                  NET MOVEMENT
+                </small>
+
+              </div>
+
+            </div>
+
+
+            {/* MAIN TWO-COLUMN LAYOUT */}
+
+            <div className="driver-layout">
+
+
+              {/* ================================================== */}
+              {/* LEFT COLUMN                                        */}
+              {/* ================================================== */}
+
+              <div className="driver-left-column">
+
+                <div className="driver-card">
+                  <div className="driver-card-header">
+                    <span>
+                      {driver_decomposition?.baseline_source === "PEER_CONTEXT"
+                        ? "Peer Benchmark"
+                        : "Revenue Components"}
+                    </span>
+
+                    <span className="driver-card-header-meta">
+                      {driver_decomposition?.baseline_source === "PEER_CONTEXT"
+                        ? "CONTEXT ONLY"
+                        : `${driver_decomposition?.baseline_months ?? 0} MONTH BASELINE`}
+                    </span>
+                  </div>
+
+                  {driver_decomposition?.baseline_source === "PEER_CONTEXT" ? (
+                    <div className="peer-context-content">
+
+                      <div className="peer-context-badge">
+                        PEER BENCHMARK · CONTEXT ONLY
+                      </div>
+
+                      <div className="peer-context-title">
+                        Category-specific attribution withheld
+                      </div>
+
+                      <p className="peer-context-description">
+                        The category has limited own history, so peer-category
+                        behavior is used for contextual comparison rather than
+                        as a substitute revenue baseline.
+                      </p>
+
+                      <div className="peer-context-stats">
+
+                        <div className="peer-context-stat">
+                          <strong>
+                            {driver_decomposition.peer_context?.peer_months ?? 0}
+                          </strong>
+                          <span>PEER MONTHS</span>
+                        </div>
+
+                        <div className="peer-context-stat">
+                          <strong>
+                            {driver_decomposition.peer_context?.peer_categories ?? 0}
+                          </strong>
+                          <span>PEER CATEGORIES</span>
+                        </div>
+
+                        <div className="peer-context-stat">
+                          <strong>
+                            {driver_decomposition.baseline_months ?? 0}
+                          </strong>
+                          <span>OWN MONTHS</span>
+                        </div>
+
+                      </div>
+
+                      <div className="peer-context-note">
+                        <span>ATTRIBUTION STATUS</span>
+                        <strong>NO DRIVER ASSIGNED</strong>
+                      </div>
+
+                    </div>
+                  ) : (
+
+                    <div className="driver-card">
+
+                      <div className="driver-card-header">
+
+                        <span>
+                          REVENUE COMPONENTS
+                        </span>
+
+                        <span className="driver-method">
+                          DETERMINISTIC
+                        </span>
+
+                      </div>
+
+
+                      {driver_decomposition.drivers.map(
+                        (driver) => (
+
+                          <div
+                            className="driver-row"
+                            key={driver.driver}
+                          >
+
+                            <div className="driver-row-top">
+
+                              <div>
+
+                                <strong>
+                                  {driver.driver}
+                                </strong>
+
+                                <span>
+
+                                  {driver.baseline.toLocaleString(
+                                    undefined,
+                                    {
+                                      maximumFractionDigits: 2,
+                                    }
+                                  )}
+
+                                  {" → "}
+
+                                  {driver.target.toLocaleString(
+                                    undefined,
+                                    {
+                                      maximumFractionDigits: 2,
+                                    }
+                                  )}
+
+                                </span>
+
+                              </div>
+
+
+                              <div className="driver-contribution">
+
+                                <strong>
+
+                                  {driver.contribution_pct > 0
+                                    ? "+"
+                                    : ""}
+
+                                  {driver.contribution_pct.toFixed(1)}%
+
+                                </strong>
+
+                                <span>
+                                  contribution
+                                </span>
+
+                              </div>
+
+                            </div>
+
+
+                            <div className="driver-bar">
+
+                              <div
+                                className={`driver-bar-fill ${
+                                  driver.direction.toLowerCase()
+                                }`}
+                                style={{
+                                  width: `${Math.min(
+                                    Math.abs(
+                                      driver.contribution_pct
+                                    ),
+                                    100
+                                  )}%`,
+                                }}
+                              />
+
+                            </div>
+
+
+                            <div className="driver-change">
+
+                              {driver.change > 0
+                                ? "+"
+                                : ""}
+
+                              {driver.change.toLocaleString(
+                                undefined,
+                                {
+                                  maximumFractionDigits: 2,
+                                }
+                              )}
+
+                            </div>
+
+                          </div>
+
+                        )
+                      )}
+
+                    </div>
+                  )}
+
+                </div>
+
+
+                {/* ================================================== */}
+                {/* OPERATIONAL CONTEXT                               */}
+                {/* ================================================== */}
+
+                {driver_decomposition.inventory_signal && (
+
+                  <div className="driver-card inventory-context">
+
+                    <div className="driver-card-header">
+
+                      <span>
+                        OPERATIONAL CONTEXT
+                      </span>
+
+                      <span className="driver-method">
+                        SUPPORTING SIGNAL
+                      </span>
+
+                    </div>
+
+
+                    <div className="inventory-driver-content">
+
+                      <span className="outcome-label">
+                        INVENTORY MOVEMENT
+                      </span>
+
+
+                      <strong>
+
+                        {driver_decomposition.inventory_signal.target > 0
+                          ? "+"
+                          : ""}
+
+                        {driver_decomposition.inventory_signal.target.toFixed(2)}%
+
+                      </strong>
+
+
+                      <p>
+                        Inventory movement is shown as an
+                        operational signal that may help explain
+                        the revenue movement. It is not treated as
+                        a mathematical revenue component or causal
+                        proof.
+                      </p>
+
+                    </div>
+
+
+                    <div className="inventory-driver-meta">
+
+                      <div>
+
+                        <span>
+                          BASELINE
+                        </span>
+
+                        <strong>
+
+                          {driver_decomposition.inventory_signal
+                            .baseline.toFixed(2)}%
+
+                        </strong>
+
+                      </div>
+
+
+                      <div>
+
+                        <span>
+                          CHANGE
+                        </span>
+
+                        <strong>
+
+                          {driver_decomposition.inventory_signal
+                            .change > 0
+                            ? "+"
+                            : ""}
+
+                          {driver_decomposition.inventory_signal
+                            .change.toFixed(2)}%
+
+                        </strong>
+
+                      </div>
+
+                    </div>
+
+                  </div>
+
+                )}
+
+              </div>
+
+
+              {/* ================================================== */}
+              {/* RIGHT COLUMN                                       */}
+              {/* ================================================== */}
+
+              <section className="lineage-section">
+
+
+                <div className="section-heading">
+
+                  <div>
+
+                    <span className="eyebrow">
+                      EVIDENCE LINEAGE
+                    </span>
+
+                    <h2>
+                      Where the investigation evidence came from
+                    </h2>
+
+                  </div>
+
+                </div>
+
+
+                <div className="lineage-table">
+
+
+                  {/* TABLE HEADER */}
+
+                  <div className="lineage-header">
+
+                    <span>
+                      SOURCE
+                    </span>
+
+                    <span>
+                      METHOD
+                    </span>
+
+                    <span>
+                      FRESHNESS
+                    </span>
+
+                    <span>
+                      ROLE
+                    </span>
+
+                    <span>
+                      CONFIDENCE
+                    </span>
+
+                  </div>
+
+
+                  {/* TABLE ROWS */}
+
+                  {evidence_lineage.map(
+                    (item, index) => (
+
+                      <div
+                        className="lineage-row"
+                        key={`${item.source}-${index}`}
+                      >
+
+
+                        {/* SOURCE */}
+
+                        <div className="lineage-source">
+
+                          <strong>
+                            {item.source}
+                          </strong>
+
+                          <span>
+                            {item.dataset}
+                          </span>
+
+                        </div>
+
+
+                        {/* METHOD */}
+
+                        <div className="lineage-method">
+                          {item.method}
+                        </div>
+
+
+                        {/* FRESHNESS */}
+
+                        <div className="lineage-freshness">
+                          {item.freshness}
+                        </div>
+
+
+                        {/* ROLE */}
+
+                        <div>
+
+                          <span
+                            className={`lineage-role ${
+                              item.contribution.toLowerCase()
+                            }`}
+                          >
+                            {item.contribution}
+                          </span>
+
+                        </div>
+
+
+                        {/* CONFIDENCE */}
+
+                        <div className="lineage-confidence">
+
+                          <strong>
+
+                            {item.confidence !== null
+                              ? `${(
+                                  item.confidence * 100
+                                ).toFixed(0)}%`
+                              : "—"}
+
+                          </strong>
+
+                        </div>
+
+                      </div>
+
+                    )
+                  )}
+
+                </div>
+
+              </section>
+
+            </div>
+
+          </section>
+
+        )}
+
+        {/* ENGINE TELEMETRY */}
+
+        {runtime_telemetry && (
+
+          <section className="telemetry-section">
+
+            <div className="telemetry-header">
+
+              <div>
+                <span className="eyebrow">
+                  ENGINE TELEMETRY
+                </span>
+
+                <h2>
+                  How the investigation was produced
+                </h2>
+              </div>
+
+              <span
+                className={`telemetry-status ${
+                  runtime_telemetry.llm_used
+                    ? "used"
+                    : "not-used"
+                }`}
+              >
+                {runtime_telemetry.llm_used
+                  ? "LLM USED"
+                  : "LLM NOT USED"}
+              </span>
+
+            </div>
+
+
+            <div className="telemetry-card">
+
+
+              {/* TOTAL RUNTIME */}
+
+              <div className="telemetry-metric">
+
+                <span>
+                  TOTAL RUNTIME
+                </span>
+
+                <strong>
+                  {runtime_telemetry.total_runtime_ms >= 1000
+                    ? `${(
+                        runtime_telemetry.total_runtime_ms /
+                        1000
+                      ).toFixed(2)} s`
+                    : `${runtime_telemetry.total_runtime_ms.toFixed(2)} ms`}
+                </strong>
+
+              </div>
+
+
+              {/* ANALYTICS */}
+
+              <div className="telemetry-metric">
+
+                <span>
+                  ANALYTICS / SQL
+                </span>
+
+                <strong>
+                  {runtime_telemetry.analytics_runtime_ms >= 1000
+                    ? `${(
+                        runtime_telemetry.analytics_runtime_ms /
+                        1000
+                      ).toFixed(2)} s`
+                    : `${runtime_telemetry.analytics_runtime_ms.toFixed(2)} ms`}
+                </strong>
+
+              </div>
+
+
+              {/* LLM */}
+
+              <div className="telemetry-metric">
+
+                <span>
+                  LLM RUNTIME
+                </span>
+
+                <strong>
+                  {runtime_telemetry.llm_runtime_ms >= 1000
+                    ? `${(
+                        runtime_telemetry.llm_runtime_ms /
+                        1000
+                      ).toFixed(2)} s`
+                    : `${runtime_telemetry.llm_runtime_ms.toFixed(2)} ms`}
+                </strong>
+
+              </div>
+
+
+              {/* EVIDENCE SOURCES */}
+
+              <div className="telemetry-metric">
+
+                <span>
+                  EVIDENCE SOURCES
+                </span>
+
+                <strong>
+                  {runtime_telemetry.evidence_sources}
+                </strong>
+
+              </div>
+
+
+              {/* DECISION PATH */}
+
+              <div className="telemetry-path">
+
+                <span>
+                  DECISION PATH
+                </span>
+
+                <strong>
+                  {runtime_telemetry.decision_path}
+                </strong>
+
+              </div>
+
+
+              {/* LLM BREAKDOWN */}
+
+              {runtime_telemetry.llm_used && (
+
+                <div className="telemetry-breakdown">
+
+                  <div>
+
+                    <span>
+                      HYPOTHESIS LLM
+                    </span>
+
+                    <strong>
+                      {(
+                        runtime_telemetry
+                          .hypothesis_llm_runtime_ms /
+                        1000
+                      ).toFixed(2)} s
+                    </strong>
+
+                  </div>
+
+
+                  <div>
+
+                    <span>
+                      SUMMARY LLM
+                    </span>
+
+                    <strong>
+                      {(
+                        runtime_telemetry
+                          .summary_llm_runtime_ms /
+                        1000
+                      ).toFixed(2)} s
+                    </strong>
+
+                  </div>
+
+                </div>
+
+              )}
+
+            </div>
+
+          </section>
+
+        )}
+
+        {/* ANALYST FEEDBACK */}
+
+        {investigation && !isAbstained && (
+
+          <section className="feedback-section">
+
+            <div className="section-heading">
+
+              <div>
+                <span className="eyebrow">
+                  ANALYST FEEDBACK
+                </span>
+
+                <h2>
+                  Help improve the investigation
+                </h2>
+
+                <p className="feedback-description">
+                  Capture analyst judgment on whether the
+                  evidence and identified driver were useful.
+                </p>
+              </div>
+
+            </div>
+
+
+            {!feedbackSubmitted ? (
+
+              <div className="feedback-card">
+
+                {/* USEFULNESS */}
+
+                <div className="feedback-group">
+
+                  <span className="feedback-label">
+                    WAS THIS INVESTIGATION USEFUL?
+                  </span>
+
+                  <div className="feedback-options">
+
+                    <button
+                      type="button"
+                      className={`feedback-option ${
+                        feedbackUsefulness === "USEFUL"
+                          ? "selected"
+                          : ""
+                      }`}
+                      onClick={() =>
+                        setFeedbackUsefulness("USEFUL")
+                      }
+                    >
+                      ✓ Useful
+                    </button>
+
+                    <button
+                      type="button"
+                      className={`feedback-option ${
+                        feedbackUsefulness === "NOT_USEFUL"
+                          ? "selected"
+                          : ""
+                      }`}
+                      onClick={() =>
+                        setFeedbackUsefulness("NOT_USEFUL")
+                      }
+                    >
+                      × Not useful
+                    </button>
+
+                  </div>
+
+                </div>
+
+
+                {/* DRIVER ASSESSMENT */}
+
+                <div className="feedback-group">
+
+                  <span className="feedback-label">
+                    DRIVER ASSESSMENT
+                  </span>
+
+                  <div className="feedback-options">
+
+                    <button
+                      type="button"
+                      className={`feedback-option ${
+                        feedbackDriver === "SUPPORTED"
+                          ? "selected"
+                          : ""
+                      }`}
+                      onClick={() =>
+                        setFeedbackDriver("SUPPORTED")
+                      }
+                    >
+                      Supported
+                    </button>
+
+                    <button
+                      type="button"
+                      className={`feedback-option ${
+                        feedbackDriver ===
+                        "PARTIALLY_SUPPORTED"
+                          ? "selected"
+                          : ""
+                      }`}
+                      onClick={() =>
+                        setFeedbackDriver(
+                          "PARTIALLY_SUPPORTED"
+                        )
+                      }
+                    >
+                      Partially supported
+                    </button>
+
+                    <button
+                      type="button"
+                      className={`feedback-option ${
+                        feedbackDriver === "NOT_SUPPORTED"
+                          ? "selected"
+                          : ""
+                      }`}
+                      onClick={() =>
+                        setFeedbackDriver(
+                          "NOT_SUPPORTED"
+                        )
+                      }
+                    >
+                      Not supported
+                    </button>
+
+                  </div>
+
+                </div>
+
+
+                {/* COMMENT */}
+
+                <div className="feedback-group">
+
+                  <span className="feedback-label">
+                    OPTIONAL ANALYST NOTE
+                  </span>
+
+                  <textarea
+                    className="feedback-textarea"
+                    value={feedbackComment}
+                    onChange={(e) =>
+                      setFeedbackComment(
+                        e.target.value
+                      )
+                    }
+                    placeholder="Add context for the next investigation..."
+                    rows={3}
+                  />
+
+                </div>
+
+
+                {/* SUBMIT */}
+
+                <div className="feedback-actions">
+
+                  <button
+                    type="button"
+                    className="feedback-submit"
+                    disabled={
+                      !feedbackUsefulness ||
+                      !feedbackDriver ||
+                      feedbackLoading
+                    }
+                    onClick={submitFeedback}
+                  >
+                    {feedbackLoading
+                      ? "RECORDING..."
+                      : "SUBMIT FEEDBACK"}
+                  </button>
+
+                </div>
+
+              </div>
+
+            ) : (
+
+              <div className="feedback-success">
+
+                <div className="feedback-success-icon">
+                  ✓
+                </div>
+
+                <div>
+
+                  <strong>
+                    Feedback recorded
+                  </strong>
+
+                  <p>
+                    Analyst input has been captured for this
+                    investigation and can be used for future
+                    calibration.
+                  </p>
+
+                </div>
+
+              </div>
+
+            )}
+
+          </section>
+
+          )}
 
 
         {/* INVESTIGATION FLOW */}

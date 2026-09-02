@@ -223,28 +223,46 @@ def calculate_z_scores(history, target_month):
 
     return df
 
-def assess_evidence_sufficiency(history, target_month):
+def assess_evidence_sufficiency(
+    history,
+    target_month,
+    peer_months=0
+):
     """
     Determine whether enough historical evidence exists
     to support a reliable investigation.
 
-    This is a gate before hypothesis generation.
-
-    The function does not decide the cause.
-    It only determines whether the available evidence
-    is sufficient for statistical interpretation.
+    Evidence hierarchy:
+    1. Prefer the category's own historical baseline.
+    2. If own history is sparse, allow peer history
+       as a fallback when sufficient peer months exist.
+    3. If neither is sufficient, abstain.
     """
 
     reasons = []
 
     if history is None or history.empty:
+
+        if peer_months >= 3:
+            return {
+                "status": "LIMITED",
+                "baseline_months": 0,
+                "minimum_required": 2,
+                "reasons": [
+                    "No own historical observations are available.",
+                    "Peer-category history is available as a fallback baseline."
+                ],
+                "baseline_source": "PEER_HISTORY"
+            }
+
         return {
             "status": "INSUFFICIENT",
             "baseline_months": 0,
             "minimum_required": 2,
             "reasons": [
                 "No historical observations are available."
-            ]
+            ],
+            "baseline_source": "NONE"
         }
 
     baseline = history[
@@ -253,51 +271,83 @@ def assess_evidence_sufficiency(history, target_month):
 
     baseline_months = len(baseline)
 
-    if baseline_months == 0:
-        reasons.append(
-            "No historical observations exist before the investigation period."
-        )
+    # --------------------------------------------------
+    # Own history is sufficient
+    # --------------------------------------------------
 
-    elif baseline_months == 1:
-        reasons.append(
-            "Only one historical observation is available; "
-            "statistical comparison is unreliable."
-        )
-
-    elif baseline_months == 2:
-        reasons.append(
-            "Only two historical observations are available; "
-            "the statistical baseline is limited."
-        )
-
-    if baseline_months < 2:
+    if baseline_months >= 4:
 
         return {
-            "status": "INSUFFICIENT",
+            "status": "SUFFICIENT",
             "baseline_months": baseline_months,
             "minimum_required": 2,
-            "reasons": reasons
+            "reasons": [
+                "Sufficient historical observations are available "
+                "for statistical comparison."
+            ],
+            "baseline_source": "OWN_HISTORY"
         }
 
-    if baseline_months < 4:
+    # --------------------------------------------------
+    # Own history exists but is limited
+    # --------------------------------------------------
+
+    if baseline_months >= 2:
 
         return {
             "status": "LIMITED",
             "baseline_months": baseline_months,
             "minimum_required": 2,
-            "reasons": reasons + [
+            "reasons": [
                 "Historical baseline exists but is limited."
-            ]
+            ],
+            "baseline_source": "OWN_HISTORY"
         }
 
+    # --------------------------------------------------
+    # Sparse own history → peer fallback
+    # --------------------------------------------------
+
+    if peer_months >= 3:
+
+        return {
+            "status": "LIMITED",
+            "baseline_months": baseline_months,
+            "minimum_required": 2,
+            "reasons": [
+                "Own category history is sparse.",
+                "Peer-category history is being used as a fallback baseline."
+            ],
+            "baseline_source": "PEER_HISTORY"
+        }
+
+    # --------------------------------------------------
+    # No reliable baseline
+    # --------------------------------------------------
+
+    if baseline_months == 0:
+
+        reasons.append(
+            "No historical observations exist before the investigation period."
+        )
+
+    elif baseline_months == 1:
+
+        reasons.append(
+            "Only one historical observation is available; "
+            "statistical comparison is unreliable."
+        )
+
+    reasons.append(
+        "Insufficient peer-category history is available for fallback."
+    )
+
     return {
-        "status": "SUFFICIENT",
+        "status": "INSUFFICIENT",
         "baseline_months": baseline_months,
         "minimum_required": 2,
-        "reasons": [
-            "Sufficient historical observations are available "
-            "for statistical comparison."
-        ]
+        "reasons": reasons,
+        "baseline_source": "NONE"
     }
 
 def build_hybrid_assessment(top_case, z_scores):
@@ -688,20 +738,46 @@ def calculate_hypothesis_confidence(hypothesis, evidence, nlp_result):
         "evidence_breakdown": evidence_breakdown
     }
 
-def assess_evidence_sufficiency(history, target_month):
+def assess_evidence_sufficiency(
+    history,
+    target_month,
+    peer_months=0
+):
     """
-    Assess whether enough historical evidence exists
+    Determine whether enough historical evidence exists
     to support a reliable investigation.
+
+    Evidence hierarchy:
+    1. Prefer the category's own historical baseline.
+    2. If own history is sparse, allow peer history
+       as a fallback when sufficient peer months exist.
+    3. If neither is sufficient, abstain.
     """
 
+    reasons = []
+
     if history is None or history.empty:
+
+        if peer_months >= 3:
+            return {
+                "status": "LIMITED",
+                "baseline_months": 0,
+                "minimum_required": 2,
+                "reasons": [
+                    "No own historical observations are available.",
+                    "Peer-category history is available as a fallback baseline."
+                ],
+                "baseline_source": "PEER_HISTORY"
+            }
+
         return {
             "status": "INSUFFICIENT",
             "baseline_months": 0,
             "minimum_required": 2,
             "reasons": [
                 "No historical observations are available."
-            ]
+            ],
+            "baseline_source": "NONE"
         }
 
     baseline = history[
@@ -710,29 +786,526 @@ def assess_evidence_sufficiency(history, target_month):
 
     baseline_months = len(baseline)
 
-    if baseline_months < 2:
+    if baseline_months >= 4:
         return {
-            "status": "INSUFFICIENT",
+            "status": "SUFFICIENT",
             "baseline_months": baseline_months,
             "minimum_required": 2,
             "reasons": [
-                "Fewer than 2 historical observations are available."
-            ]
+                "Sufficient historical observations are available "
+                "for statistical comparison."
+            ],
+            "baseline_source": "OWN_HISTORY"
         }
 
-    if baseline_months < 4:
+    if baseline_months >= 2:
         return {
             "status": "LIMITED",
             "baseline_months": baseline_months,
             "minimum_required": 2,
             "reasons": [
-                "Only a small historical baseline is available."
-            ]
+                "Historical baseline exists but is limited."
+            ],
+            "baseline_source": "OWN_HISTORY"
         }
 
+    if peer_months >= 3:
+        return {
+            "status": "LIMITED",
+            "baseline_months": baseline_months,
+            "minimum_required": 2,
+            "reasons": [
+                "Own category history is sparse.",
+                "Peer-category history is being used as a fallback baseline."
+            ],
+            "baseline_source": "PEER_HISTORY"
+        }
+
+    if baseline_months == 0:
+        reasons.append(
+            "No historical observations exist before the investigation period."
+        )
+    elif baseline_months == 1:
+        reasons.append(
+            "Only one historical observation is available; "
+            "statistical comparison is unreliable."
+        )
+
+    reasons.append(
+        "Insufficient peer-category history is available for fallback."
+    )
+
     return {
-        "status": "SUFFICIENT",
+        "status": "INSUFFICIENT",
         "baseline_months": baseline_months,
         "minimum_required": 2,
-        "reasons": []
+        "reasons": reasons,
+        "baseline_source": "NONE"
+    }
+
+def calculate_driver_decomposition(
+    region,
+    product_category_name,
+    target_month,
+    inventory_history=None
+):
+    """
+    Decompose revenue movement into measurable business drivers.
+
+    Revenue = Order Volume × Average Order Value
+
+    Baseline strategy:
+    1. Prefer the product category's own historical data.
+    2. If own history is sparse, use a peer baseline from
+       other product categories in the same region.
+    3. If neither provides enough evidence, abstain.
+
+    Inventory is treated as a contextual operational signal,
+    not as a mathematical component of revenue.
+    """
+
+    engine = get_engine()
+
+    # --------------------------------------------------
+    # 1. Load target category history
+    # --------------------------------------------------
+
+    query = """
+        SELECT
+            month,
+            region,
+            product_category_name,
+            revenue,
+            total_orders,
+            items_sold
+        FROM analytics_revenue_region_category
+        WHERE region = %(region)s
+          AND product_category_name = %(category)s
+          AND month <= %(target_month)s
+        ORDER BY month;
+    """
+
+    params = {
+        "region": region,
+        "category": product_category_name,
+        "target_month": target_month
+    }
+
+    df = pd.read_sql(
+        query,
+        engine,
+        params=params
+    )
+
+    if df.empty:
+        return None
+
+    target_rows = df[
+        df["month"] == target_month
+    ]
+
+    if target_rows.empty:
+        return None
+
+    target = target_rows.iloc[0]
+
+    # --------------------------------------------------
+    # 2. Determine baseline source
+    #
+    # Prefer own history when at least 3 months exist.
+    # Otherwise fall back to peer categories.
+    # --------------------------------------------------
+
+    own_history = df[
+        df["month"] < target_month
+    ]
+
+    baseline_source = "OWN_HISTORY"
+
+    if len(own_history) >= 3:
+
+        baseline = own_history.tail(3)
+
+    else:
+
+        # --------------------------------------------------
+        # Sparse own history
+        #
+        # Peer categories are used ONLY as contextual
+        # benchmark evidence.
+        #
+        # They are NOT treated as the target category's
+        # revenue baseline.
+        # --------------------------------------------------
+
+        peer_query = """
+            SELECT
+                month,
+                product_category_name,
+                revenue,
+                total_orders,
+                items_sold
+            FROM analytics_revenue_region_category
+            WHERE region = %(region)s
+              AND product_category_name <> %(category)s
+              AND month < %(target_month)s
+            ORDER BY month;
+        """
+
+        peer_params = {
+            "region": region,
+            "category": product_category_name,
+            "target_month": target_month
+        }
+
+        peer_df = pd.read_sql(
+            peer_query,
+            engine,
+            params=peer_params
+        )
+
+        # Count distinct months containing peer observations.
+        peer_months = (
+            peer_df["month"].nunique()
+            if not peer_df.empty
+            else 0
+        )
+
+        if peer_months < 3:
+
+            return None
+
+        # --------------------------------------------------
+        # Important:
+        #
+        # Do NOT calculate target-category revenue change
+        # against aggregated peer revenue.
+        #
+        # Sparse history is contextual only.
+        # --------------------------------------------------
+
+        return {
+            "baseline_months": len(own_history),
+
+            "baseline_source": "PEER_CONTEXT",
+
+            "baseline_revenue": None,
+
+            "target_revenue": round(
+                float(target["revenue"]),
+                2
+            ),
+
+            "revenue_change": None,
+
+            "revenue_change_pct": None,
+
+            "baseline_orders": None,
+
+            "target_orders": round(
+                float(target["total_orders"]),
+                2
+            ),
+
+            "baseline_aov": None,
+
+            "target_aov": round(
+                (
+                    float(target["revenue"])
+                    / float(target["total_orders"])
+                )
+                if float(target["total_orders"]) != 0
+                else 0,
+                2
+            ),
+
+            "drivers": [],
+
+            "inventory_signal": None,
+
+            "peer_context": {
+                "peer_months": peer_months,
+
+                "peer_categories": int(
+                    peer_df[
+                        "product_category_name"
+                    ].nunique()
+                ),
+
+                "description":
+                    "Peer-category history is available "
+                    "for contextual benchmarking, but is "
+                    "not used as a category-specific "
+                    "revenue baseline."
+            }
+        }
+
+    # --------------------------------------------------
+    # 3. Baseline metrics
+    # --------------------------------------------------
+
+    baseline_revenue = baseline["revenue"].mean()
+    baseline_orders = baseline["total_orders"].mean()
+
+    baseline_aov = (
+        baseline_revenue / baseline_orders
+        if baseline_orders != 0
+        else 0
+    )
+
+    # --------------------------------------------------
+    # 4. Target metrics
+    # --------------------------------------------------
+
+    target_revenue = float(target["revenue"])
+    target_orders = float(target["total_orders"])
+
+    target_aov = (
+        target_revenue / target_orders
+        if target_orders != 0
+        else 0
+    )
+
+    # --------------------------------------------------
+    # 5. Overall revenue movement
+    # --------------------------------------------------
+
+    revenue_change = (
+        target_revenue - baseline_revenue
+    )
+
+    revenue_change_pct = (
+        (revenue_change / baseline_revenue) * 100
+        if baseline_revenue != 0
+        else 0
+    )
+
+    # --------------------------------------------------
+    # 6. Shapley-style two-factor decomposition
+    #
+    # Revenue movement is allocated between:
+    # 1. Order Volume
+    # 2. Average Order Value
+    # --------------------------------------------------
+
+    order_change = (
+        target_orders - baseline_orders
+    )
+
+    aov_change = (
+        target_aov - baseline_aov
+    )
+
+    order_volume_contribution = (
+        order_change
+        * ((baseline_aov + target_aov) / 2)
+    )
+
+    aov_contribution = (
+        aov_change
+        * ((baseline_orders + target_orders) / 2)
+    )
+
+    # --------------------------------------------------
+    # 7. Contribution percentages
+    # --------------------------------------------------
+
+    if revenue_change != 0:
+
+        order_contribution_pct = (
+            order_volume_contribution
+            / abs(revenue_change)
+        ) * 100
+
+        aov_contribution_pct = (
+            aov_contribution
+            / abs(revenue_change)
+        ) * 100
+
+    else:
+
+        order_contribution_pct = 0
+        aov_contribution_pct = 0
+
+    # --------------------------------------------------
+    # 8. Rank revenue drivers
+    # --------------------------------------------------
+
+    drivers = [
+        {
+            "driver": "Order Volume",
+            "metric": "total_orders",
+            "baseline": round(
+                float(baseline_orders), 2
+            ),
+            "target": round(
+                float(target_orders), 2
+            ),
+            "change": round(
+                float(order_change), 2
+            ),
+            "contribution": round(
+                float(order_volume_contribution), 2
+            ),
+            "contribution_pct": round(
+                float(order_contribution_pct), 2
+            ),
+            "direction": (
+                "NEGATIVE"
+                if order_volume_contribution < 0
+                else "POSITIVE"
+                if order_volume_contribution > 0
+                else "NEUTRAL"
+            )
+        },
+
+        {
+            "driver": "Average Order Value",
+            "metric": "average_order_value",
+            "baseline": round(
+                float(baseline_aov), 2
+            ),
+            "target": round(
+                float(target_aov), 2
+            ),
+            "change": round(
+                float(aov_change), 2
+            ),
+            "contribution": round(
+                float(aov_contribution), 2
+            ),
+            "contribution_pct": round(
+                float(aov_contribution_pct), 2
+            ),
+            "direction": (
+                "NEGATIVE"
+                if aov_contribution < 0
+                else "POSITIVE"
+                if aov_contribution > 0
+                else "NEUTRAL"
+            )
+        }
+    ]
+
+    drivers = sorted(
+        drivers,
+        key=lambda x: abs(x["contribution"]),
+        reverse=True
+    )
+
+    for rank, driver in enumerate(
+        drivers,
+        start=1
+    ):
+        driver["rank"] = rank
+
+    # --------------------------------------------------
+    # 9. Inventory context
+    # --------------------------------------------------
+
+    inventory_signal = None
+
+    if inventory_history is not None:
+
+        target_inventory = inventory_history[
+            inventory_history["month"] == target_month
+        ]
+
+        baseline_inventory = inventory_history[
+            inventory_history["month"] < target_month
+        ]
+
+        if (
+            not target_inventory.empty
+            and not baseline_inventory.empty
+        ):
+
+            target_stock_change = float(
+                target_inventory[
+                    "stock_change_pct"
+                ].iloc[0]
+            )
+
+            baseline_stock_change = float(
+                baseline_inventory[
+                    "stock_change_pct"
+                ].tail(3).mean()
+            )
+
+            inventory_signal = {
+                "driver": "Inventory Movement",
+                "baseline": round(
+                    baseline_stock_change,
+                    2
+                ),
+                "target": round(
+                    target_stock_change,
+                    2
+                ),
+                "change": round(
+                    target_stock_change
+                    - baseline_stock_change,
+                    2
+                ),
+                "direction": (
+                    "NEGATIVE"
+                    if target_stock_change
+                    < baseline_stock_change
+                    else "POSITIVE"
+                ),
+                "role": "OPERATIONAL_SIGNAL"
+            }
+
+    # --------------------------------------------------
+    # 10. Return decomposition
+    # --------------------------------------------------
+
+    return {
+        "baseline_months": len(baseline),
+
+        "baseline_source": baseline_source,
+
+        "baseline_revenue": round(
+            float(baseline_revenue),
+            2
+        ),
+
+        "target_revenue": round(
+            float(target_revenue),
+            2
+        ),
+
+        "revenue_change": round(
+            float(revenue_change),
+            2
+        ),
+
+        "revenue_change_pct": round(
+            float(revenue_change_pct),
+            2
+        ),
+
+        "baseline_orders": round(
+            float(baseline_orders),
+            2
+        ),
+
+        "target_orders": round(
+            float(target_orders),
+            2
+        ),
+
+        "baseline_aov": round(
+            float(baseline_aov),
+            2
+        ),
+
+        "target_aov": round(
+            float(target_aov),
+            2
+        ),
+
+        "drivers": drivers,
+
+        "inventory_signal": inventory_signal
     }
