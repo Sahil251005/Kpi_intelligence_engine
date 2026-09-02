@@ -1684,393 +1684,6 @@ function App() {
 
         )}
 
-        {/* ENGINE TELEMETRY */}
-
-        {runtime_telemetry && (
-
-          <section className="telemetry-section">
-
-            <div className="telemetry-header">
-
-              <div>
-                <span className="eyebrow">
-                  ENGINE TELEMETRY
-                </span>
-
-                <h2>
-                  How the investigation was produced
-                </h2>
-              </div>
-
-              <span
-                className={`telemetry-status ${
-                  runtime_telemetry.llm_used
-                    ? "used"
-                    : "not-used"
-                }`}
-              >
-                {runtime_telemetry.llm_used
-                  ? "LLM USED"
-                  : "LLM NOT USED"}
-              </span>
-
-            </div>
-
-
-            <div className="telemetry-card">
-
-
-              {/* TOTAL RUNTIME */}
-
-              <div className="telemetry-metric">
-
-                <span>
-                  TOTAL RUNTIME
-                </span>
-
-                <strong>
-                  {runtime_telemetry.total_runtime_ms >= 1000
-                    ? `${(
-                        runtime_telemetry.total_runtime_ms /
-                        1000
-                      ).toFixed(2)} s`
-                    : `${runtime_telemetry.total_runtime_ms.toFixed(2)} ms`}
-                </strong>
-
-              </div>
-
-
-              {/* ANALYTICS */}
-
-              <div className="telemetry-metric">
-
-                <span>
-                  ANALYTICS / SQL
-                </span>
-
-                <strong>
-                  {runtime_telemetry.analytics_runtime_ms >= 1000
-                    ? `${(
-                        runtime_telemetry.analytics_runtime_ms /
-                        1000
-                      ).toFixed(2)} s`
-                    : `${runtime_telemetry.analytics_runtime_ms.toFixed(2)} ms`}
-                </strong>
-
-              </div>
-
-
-              {/* LLM */}
-
-              <div className="telemetry-metric">
-
-                <span>
-                  LLM RUNTIME
-                </span>
-
-                <strong>
-                  {runtime_telemetry.llm_runtime_ms >= 1000
-                    ? `${(
-                        runtime_telemetry.llm_runtime_ms /
-                        1000
-                      ).toFixed(2)} s`
-                    : `${runtime_telemetry.llm_runtime_ms.toFixed(2)} ms`}
-                </strong>
-
-              </div>
-
-
-              {/* EVIDENCE SOURCES */}
-
-              <div className="telemetry-metric">
-
-                <span>
-                  EVIDENCE SOURCES
-                </span>
-
-                <strong>
-                  {runtime_telemetry.evidence_sources}
-                </strong>
-
-              </div>
-
-
-              {/* DECISION PATH */}
-
-              <div className="telemetry-path">
-
-                <span>
-                  DECISION PATH
-                </span>
-
-                <strong>
-                  {runtime_telemetry.decision_path}
-                </strong>
-
-              </div>
-
-
-              {/* LLM BREAKDOWN */}
-
-              {runtime_telemetry.llm_used && (
-
-                <div className="telemetry-breakdown">
-
-                  <div>
-
-                    <span>
-                      HYPOTHESIS LLM
-                    </span>
-
-                    <strong>
-                      {(
-                        runtime_telemetry
-                          .hypothesis_llm_runtime_ms /
-                        1000
-                      ).toFixed(2)} s
-                    </strong>
-
-                  </div>
-
-
-                  <div>
-
-                    <span>
-                      SUMMARY LLM
-                    </span>
-
-                    <strong>
-                      {(
-                        runtime_telemetry
-                          .summary_llm_runtime_ms /
-                        1000
-                      ).toFixed(2)} s
-                    </strong>
-
-                  </div>
-
-                </div>
-
-              )}
-
-            </div>
-
-          </section>
-
-        )}
-
-        {/* ANALYST FEEDBACK */}
-
-        {investigation && !isAbstained && (
-
-          <section className="feedback-section">
-
-            <div className="section-heading">
-
-              <div>
-                <span className="eyebrow">
-                  ANALYST FEEDBACK
-                </span>
-
-                <h2>
-                  Help improve the investigation
-                </h2>
-
-                <p className="feedback-description">
-                  Capture analyst judgment on whether the
-                  evidence and identified driver were useful.
-                </p>
-              </div>
-
-            </div>
-
-
-            {!feedbackSubmitted ? (
-
-              <div className="feedback-card">
-
-                {/* USEFULNESS */}
-
-                <div className="feedback-group">
-
-                  <span className="feedback-label">
-                    WAS THIS INVESTIGATION USEFUL?
-                  </span>
-
-                  <div className="feedback-options">
-
-                    <button
-                      type="button"
-                      className={`feedback-option ${
-                        feedbackUsefulness === "USEFUL"
-                          ? "selected"
-                          : ""
-                      }`}
-                      onClick={() =>
-                        setFeedbackUsefulness("USEFUL")
-                      }
-                    >
-                      ✓ Useful
-                    </button>
-
-                    <button
-                      type="button"
-                      className={`feedback-option ${
-                        feedbackUsefulness === "NOT_USEFUL"
-                          ? "selected"
-                          : ""
-                      }`}
-                      onClick={() =>
-                        setFeedbackUsefulness("NOT_USEFUL")
-                      }
-                    >
-                      × Not useful
-                    </button>
-
-                  </div>
-
-                </div>
-
-
-                {/* DRIVER ASSESSMENT */}
-
-                <div className="feedback-group">
-
-                  <span className="feedback-label">
-                    DRIVER ASSESSMENT
-                  </span>
-
-                  <div className="feedback-options">
-
-                    <button
-                      type="button"
-                      className={`feedback-option ${
-                        feedbackDriver === "SUPPORTED"
-                          ? "selected"
-                          : ""
-                      }`}
-                      onClick={() =>
-                        setFeedbackDriver("SUPPORTED")
-                      }
-                    >
-                      Supported
-                    </button>
-
-                    <button
-                      type="button"
-                      className={`feedback-option ${
-                        feedbackDriver ===
-                        "PARTIALLY_SUPPORTED"
-                          ? "selected"
-                          : ""
-                      }`}
-                      onClick={() =>
-                        setFeedbackDriver(
-                          "PARTIALLY_SUPPORTED"
-                        )
-                      }
-                    >
-                      Partially supported
-                    </button>
-
-                    <button
-                      type="button"
-                      className={`feedback-option ${
-                        feedbackDriver === "NOT_SUPPORTED"
-                          ? "selected"
-                          : ""
-                      }`}
-                      onClick={() =>
-                        setFeedbackDriver(
-                          "NOT_SUPPORTED"
-                        )
-                      }
-                    >
-                      Not supported
-                    </button>
-
-                  </div>
-
-                </div>
-
-
-                {/* COMMENT */}
-
-                <div className="feedback-group">
-
-                  <span className="feedback-label">
-                    OPTIONAL ANALYST NOTE
-                  </span>
-
-                  <textarea
-                    className="feedback-textarea"
-                    value={feedbackComment}
-                    onChange={(e) =>
-                      setFeedbackComment(
-                        e.target.value
-                      )
-                    }
-                    placeholder="Add context for the next investigation..."
-                    rows={3}
-                  />
-
-                </div>
-
-
-                {/* SUBMIT */}
-
-                <div className="feedback-actions">
-
-                  <button
-                    type="button"
-                    className="feedback-submit"
-                    disabled={
-                      !feedbackUsefulness ||
-                      !feedbackDriver ||
-                      feedbackLoading
-                    }
-                    onClick={submitFeedback}
-                  >
-                    {feedbackLoading
-                      ? "RECORDING..."
-                      : "SUBMIT FEEDBACK"}
-                  </button>
-
-                </div>
-
-              </div>
-
-            ) : (
-
-              <div className="feedback-success">
-
-                <div className="feedback-success-icon">
-                  ✓
-                </div>
-
-                <div>
-
-                  <strong>
-                    Feedback recorded
-                  </strong>
-
-                  <p>
-                    Analyst input has been captured for this
-                    investigation and can be used for future
-                    calibration.
-                  </p>
-
-                </div>
-
-              </div>
-
-            )}
-
-          </section>
-
-          )}
-
-
         {/* INVESTIGATION FLOW */}
 
         {isAbstained ? (
@@ -3138,6 +2751,392 @@ function App() {
         </div>
 
       </section>
+
+      {/* ENGINE TELEMETRY */}
+
+        {runtime_telemetry && (
+
+          <section className="telemetry-section">
+
+            <div className="telemetry-header">
+
+              <div>
+                <span className="eyebrow">
+                  ENGINE TELEMETRY
+                </span>
+
+                <h2>
+                  How the investigation was produced
+                </h2>
+              </div>
+
+              <span
+                className={`telemetry-status ${
+                  runtime_telemetry.llm_used
+                    ? "used"
+                    : "not-used"
+                }`}
+              >
+                {runtime_telemetry.llm_used
+                  ? "LLM USED"
+                  : "LLM NOT USED"}
+              </span>
+
+            </div>
+
+
+            <div className="telemetry-card">
+
+
+              {/* TOTAL RUNTIME */}
+
+              <div className="telemetry-metric">
+
+                <span>
+                  TOTAL RUNTIME
+                </span>
+
+                <strong>
+                  {runtime_telemetry.total_runtime_ms >= 1000
+                    ? `${(
+                        runtime_telemetry.total_runtime_ms /
+                        1000
+                      ).toFixed(2)} s`
+                    : `${runtime_telemetry.total_runtime_ms.toFixed(2)} ms`}
+                </strong>
+
+              </div>
+
+
+              {/* ANALYTICS */}
+
+              <div className="telemetry-metric">
+
+                <span>
+                  ANALYTICS / SQL
+                </span>
+
+                <strong>
+                  {runtime_telemetry.analytics_runtime_ms >= 1000
+                    ? `${(
+                        runtime_telemetry.analytics_runtime_ms /
+                        1000
+                      ).toFixed(2)} s`
+                    : `${runtime_telemetry.analytics_runtime_ms.toFixed(2)} ms`}
+                </strong>
+
+              </div>
+
+
+              {/* LLM */}
+
+              <div className="telemetry-metric">
+
+                <span>
+                  LLM RUNTIME
+                </span>
+
+                <strong>
+                  {runtime_telemetry.llm_runtime_ms >= 1000
+                    ? `${(
+                        runtime_telemetry.llm_runtime_ms /
+                        1000
+                      ).toFixed(2)} s`
+                    : `${runtime_telemetry.llm_runtime_ms.toFixed(2)} ms`}
+                </strong>
+
+              </div>
+
+
+              {/* EVIDENCE SOURCES */}
+
+              <div className="telemetry-metric">
+
+                <span>
+                  EVIDENCE SOURCES
+                </span>
+
+                <strong>
+                  {runtime_telemetry.evidence_sources}
+                </strong>
+
+              </div>
+
+
+              {/* DECISION PATH */}
+
+              <div className="telemetry-path">
+
+                <span>
+                  DECISION PATH
+                </span>
+
+                <strong>
+                  {runtime_telemetry.decision_path}
+                </strong>
+
+              </div>
+
+
+              {/* LLM BREAKDOWN */}
+
+              {runtime_telemetry.llm_used && (
+
+                <div className="telemetry-breakdown">
+
+                  <div>
+
+                    <span>
+                      HYPOTHESIS LLM
+                    </span>
+
+                    <strong>
+                      {(
+                        runtime_telemetry
+                          .hypothesis_llm_runtime_ms /
+                        1000
+                      ).toFixed(2)} s
+                    </strong>
+
+                  </div>
+
+
+                  <div>
+
+                    <span>
+                      SUMMARY LLM
+                    </span>
+
+                    <strong>
+                      {(
+                        runtime_telemetry
+                          .summary_llm_runtime_ms /
+                        1000
+                      ).toFixed(2)} s
+                    </strong>
+
+                  </div>
+
+                </div>
+
+              )}
+
+            </div>
+
+          </section>
+
+        )}
+
+        {/* ANALYST FEEDBACK */}
+
+        {investigation && !isAbstained && (
+
+          <section className="feedback-section">
+
+            <div className="section-heading">
+
+              <div>
+                <span className="eyebrow">
+                  ANALYST FEEDBACK
+                </span>
+
+                <h2>
+                  Help improve the investigation
+                </h2>
+
+                <p className="feedback-description">
+                  Capture analyst judgment on whether the
+                  evidence and identified driver were useful.
+                </p>
+              </div>
+
+            </div>
+
+
+            {!feedbackSubmitted ? (
+
+              <div className="feedback-card">
+
+                {/* USEFULNESS */}
+
+                <div className="feedback-group">
+
+                  <span className="feedback-label">
+                    WAS THIS INVESTIGATION USEFUL?
+                  </span>
+
+                  <div className="feedback-options">
+
+                    <button
+                      type="button"
+                      className={`feedback-option ${
+                        feedbackUsefulness === "USEFUL"
+                          ? "selected"
+                          : ""
+                      }`}
+                      onClick={() =>
+                        setFeedbackUsefulness("USEFUL")
+                      }
+                    >
+                      ✓ Useful
+                    </button>
+
+                    <button
+                      type="button"
+                      className={`feedback-option ${
+                        feedbackUsefulness === "NOT_USEFUL"
+                          ? "selected"
+                          : ""
+                      }`}
+                      onClick={() =>
+                        setFeedbackUsefulness("NOT_USEFUL")
+                      }
+                    >
+                      × Not useful
+                    </button>
+
+                  </div>
+
+                </div>
+
+
+                {/* DRIVER ASSESSMENT */}
+
+                <div className="feedback-group">
+
+                  <span className="feedback-label">
+                    DRIVER ASSESSMENT
+                  </span>
+
+                  <div className="feedback-options">
+
+                    <button
+                      type="button"
+                      className={`feedback-option ${
+                        feedbackDriver === "SUPPORTED"
+                          ? "selected"
+                          : ""
+                      }`}
+                      onClick={() =>
+                        setFeedbackDriver("SUPPORTED")
+                      }
+                    >
+                      Supported
+                    </button>
+
+                    <button
+                      type="button"
+                      className={`feedback-option ${
+                        feedbackDriver ===
+                        "PARTIALLY_SUPPORTED"
+                          ? "selected"
+                          : ""
+                      }`}
+                      onClick={() =>
+                        setFeedbackDriver(
+                          "PARTIALLY_SUPPORTED"
+                        )
+                      }
+                    >
+                      Partially supported
+                    </button>
+
+                    <button
+                      type="button"
+                      className={`feedback-option ${
+                        feedbackDriver === "NOT_SUPPORTED"
+                          ? "selected"
+                          : ""
+                      }`}
+                      onClick={() =>
+                        setFeedbackDriver(
+                          "NOT_SUPPORTED"
+                        )
+                      }
+                    >
+                      Not supported
+                    </button>
+
+                  </div>
+
+                </div>
+
+
+                {/* COMMENT */}
+
+                <div className="feedback-group">
+
+                  <span className="feedback-label">
+                    OPTIONAL ANALYST NOTE
+                  </span>
+
+                  <textarea
+                    className="feedback-textarea"
+                    value={feedbackComment}
+                    onChange={(e) =>
+                      setFeedbackComment(
+                        e.target.value
+                      )
+                    }
+                    placeholder="Add context for the next investigation..."
+                    rows={3}
+                  />
+
+                </div>
+
+
+                {/* SUBMIT */}
+
+                <div className="feedback-actions">
+
+                  <button
+                    type="button"
+                    className="feedback-submit"
+                    disabled={
+                      !feedbackUsefulness ||
+                      !feedbackDriver ||
+                      feedbackLoading
+                    }
+                    onClick={submitFeedback}
+                  >
+                    {feedbackLoading
+                      ? "RECORDING..."
+                      : "SUBMIT FEEDBACK"}
+                  </button>
+
+                </div>
+
+              </div>
+
+            ) : (
+
+              <div className="feedback-success">
+
+                <div className="feedback-success-icon">
+                  ✓
+                </div>
+
+                <div>
+
+                  <strong>
+                    Feedback recorded
+                  </strong>
+
+                  <p>
+                    Analyst input has been captured for this
+                    investigation and can be used for future
+                    calibration.
+                  </p>
+
+                </div>
+
+              </div>
+
+            )}
+
+          </section>
+
+          )}
 
       </main>
 
