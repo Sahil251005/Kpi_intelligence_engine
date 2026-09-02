@@ -1,544 +1,511 @@
-# BusinessIntelligence.ai
+# KPI Intelligence Engine
 
-## From Metrics to Meaning
+### From KPI Signals to Evidence-Based Business Decisions
 
-BusinessIntelligence.ai is an end-to-end KPI investigation platform that goes beyond detecting business metric anomalies.
+KPI Intelligence Engine is an AI-powered business investigation platform that transforms KPI deviations into structured, evidence-backed business insights.
 
-Instead of simply showing that a KPI changed, the system investigates **what changed, what evidence supports the change, what may explain it, how strong the evidence is, and what should happen next**.
-
-The platform combines PostgreSQL analytics, Python-based investigation logic, statistical analysis, LLM-assisted hypothesis generation, NLP analysis, and a React dashboard.
-
-### Core Flow
-
-**Business Signal → Evidence → Hypothesis → Confidence → Action**
+Instead of simply displaying that a KPI has changed, the system investigates how unusual the change is, compares it with historical behavior, identifies supporting evidence, generates an evidence-grounded hypothesis, evaluates confidence, and recommends what should be investigated next.
 
 ---
 
 # Problem Statement
 
-Business dashboards are effective at showing **what happened**, but understanding **why it happened** often requires manually analyzing multiple data sources.
+Traditional KPI dashboards answer:
 
-A change in revenue, for example, may be related to inventory availability, product performance, regional activity, customer feedback, or other business factors.
+> **"What happened?"**
 
-The challenge is to move beyond KPI monitoring and build a system that can:
+But they often do not answer:
 
-- Identify unusual KPI movements.
-- Find where the change is concentrated.
-- Analyze relevant business drivers.
-- Build evidence from multiple signals.
-- Generate possible explanations.
-- Evaluate supporting and weakening evidence.
-- Communicate uncertainty.
-- Recommend practical next steps.
+- Why is the KPI changing?
+- Is the change actually unusual?
+- How does it compare with historical behavior?
+- Is the issue isolated to a particular region, category, or warehouse?
+- What evidence supports a possible explanation?
+- How confident should the business be in that explanation?
+- What should be investigated next?
 
-The objective is to transform a KPI change into an **evidence-based investigation rather than a simple dashboard alert**.
+For example:
+
+> Revenue decreased by 25%.
+
+That number alone does not establish whether the decline is normal variation, a genuine anomaly, an inventory-related signal, or something that requires further investigation.
+
+KPI Intelligence Engine addresses this gap by turning KPI anomalies into a structured investigation workflow.
 
 ---
 
 # Our Solution
 
-BusinessIntelligence.ai takes a business KPI signal and turns it into a structured investigation.
+The platform follows an evidence-first investigation process:
 
-The system:
+**KPI Signal → Historical Context → Statistical Evidence → Business Evidence → Hypothesis → Confidence → Recommendation**
 
-1. Detects unusual KPI behavior.
-2. Compares current performance with historical behavior.
-3. Identifies important revenue and inventory signals.
-4. Builds structured evidence from the available data.
-5. Generates evidence-grounded hypotheses using an LLM.
-6. Analyzes hypothesis relationships, direction, and uncertainty.
-7. Calculates confidence from supporting and weakening evidence.
-8. Produces an operational recommendation.
-9. Presents the complete investigation through an interactive dashboard.
+Rather than allowing an AI model to directly guess the cause of a KPI change, the system first constructs an evidence layer and then uses the LLM to generate hypotheses grounded in that evidence.
 
-### Investigation Philosophy
-
-> **Evidence can justify an investigation without proving causation.**
-
-The system therefore distinguishes between:
-
-- **Observed** — what the data directly shows.
-- **Suggested** — what the evidence makes plausible.
-- **Unknown** — what the available evidence cannot establish.
-
-This prevents the platform from presenting correlation as confirmed causation.
+This makes the investigation more explainable and helps prevent unsupported causal claims.
 
 ---
 
 # Key Features
 
-- **KPI Anomaly Detection** — Identifies unusual business movements.
-- **Historical Analysis** — Compares current behavior with historical patterns.
-- **Driver Analysis** — Breaks down KPI changes by region and product category.
-- **Inventory Context** — Adds inventory and reorder signals to the investigation.
-- **Statistical Evidence** — Uses deviations and Z-scores to quantify unusual behavior.
-- **Evidence Building** — Converts analytical results into structured evidence.
-- **AI Hypothesis Generation** — Produces evidence-grounded explanations.
-- **Hypothesis Analysis** — Extracts relationships, direction, claim types, and uncertainty.
-- **Confidence Scoring** — Balances supporting and weakening evidence.
-- **Recommendation Engine** — Converts investigation findings into practical next steps.
-- **Uncertainty Handling** — Avoids unsupported causal conclusions.
-- **Interactive Dashboard** — Presents the complete investigation in a business-friendly interface.
-- **Historical Visualization** — Displays revenue and inventory movement over time.
-- **Executive Outcome** — Provides an immediate summary of what happened, why it matters, and what to do.
-- **Executive Business Summary** — Provides a concise final business interpretation.
-- **Dynamic API Integration** — Frontend results are retrieved dynamically from the backend.
+### KPI Anomaly Investigation
 
----
+Identifies high-priority investigation cases from the KPI investigation queue.
 
-# Dashboard
+### Historical Baseline Analysis
 
-The dashboard is designed around the same investigation philosophy as the backend.
+Compares the current KPI with historical observations for the relevant business dimensions, including region, product category, warehouse, and time period.
 
-### Dashboard Flow
+### Statistical Anomaly Detection
 
-**Investigation Case → KPI Snapshot → Investigation Outcome → Signal → Evidence → Hypothesis → Confidence → Action → Executive Summary**
+Uses statistical analysis and z-scores to determine how unusual current KPI behavior is compared with historical patterns.
 
-### Investigation Overview
+### Revenue + Inventory Intelligence
 
-The overview identifies the selected investigation case and displays:
+The system analyzes revenue and inventory signals together instead of treating them as completely independent metrics.
 
-- Investigation period
-- Region
-- Product category
-- Warehouse
-- Revenue
-- Inventory
-- Reorder level
-- Investigation priority
-- Confidence
+Example:
 
-### Investigation Outcome
+```text
+Revenue Decline
+      +
+Rapid Inventory Change
+      +
+Historical Anomaly
+      ↓
+High-Priority Investigation
+```
 
-A concise executive layer answers three questions immediately:
+### Evidence-Based Investigation
 
-**What happened?**
-
-Revenue and inventory movement are summarized using the key KPI deviations.
-
-**Why does it matter?**
-
-The dominant business signal and its statistical strength are highlighted.
-
-**What should happen next?**
-
-The recommended operational investigation is presented without requiring the user to inspect every analytical detail.
-
-The section also communicates when causation remains unconfirmed.
-
-### Investigation Flow
-
-The dashboard presents the reasoning process as:
-
-**Signal → Evidence → Hypothesis → Action**
-
-This makes the investigation understandable to both technical and business users.
-
-### Historical Signal Movement
-
-Revenue and inventory movement are visualized across historical periods.
-
-The investigation month is highlighted so users can compare the current anomaly with previous behavior.
-
-### Statistical Evidence
-
-The dashboard presents the main statistical signals behind the investigation, including:
+The investigation engine builds structured evidence from:
 
 - Revenue deviation
+- Historical KPI behavior
 - Inventory movement
-- Inventory Z-score
-- Dominant business signal
+- Reorder threshold
+- Statistical anomaly status
+- Cross-signal relationships
+- Business KPI signals
 
-### AI Investigation Hypothesis
+### Evidence-Grounded AI Hypotheses
 
-The dashboard presents an evidence-grounded explanation generated from the structured investigation evidence.
+The LLM generates potential explanations using the available evidence.
 
-It separates:
+The system is designed to avoid inventing unsupported events such as:
 
-- What was observed.
-- What the evidence suggests.
-- What remains unknown.
+- Supplier failures
+- Shipment losses
+- Fraud
+- Operational incidents
+- External causes
 
-### Confidence Assessment
+The generated hypothesis also identifies unknowns where the available evidence is insufficient.
 
-The confidence section communicates:
+### NLP Hypothesis Interpretation
 
-- Overall confidence score
-- Confidence level
-- Supporting evidence score
-- Weakening evidence score
-
-Confidence represents the strength of the available evidence, not proof of causation.
-
-### Recommended Action
-
-The recommendation section translates the investigation into operational validation steps.
-
-It provides:
-
-- Reasons supporting the recommendation.
-- Specific next steps.
-- Causal warnings where appropriate.
-
-### Executive Business Summary
-
-The final section condenses the investigation into an executive-friendly record covering:
-
-1. Executive interpretation
-2. Key evidence
-3. Investigation hypothesis
-4. Recommended action
-5. Important caveat
-
----
-
-# How It Works
-
-## End-to-End Investigation Pipeline
-
-**Investigation Case**
-
-↓
-
-**Historical Analysis**
-
-↓
-
-**Z-Score Analysis**
-
-↓
-
-**Hybrid Assessment**
-
-↓
-
-**Evidence Construction**
-
-↓
-
-**Hypothesis Generation**
-
-↓
-
-**NLP Hypothesis Analysis**
-
-↓
-
-**Confidence Scoring**
-
-↓
-
-**Recommendation**
-
-↓
-
-**Executive Business Summary**
-
----
-
-## 1. Investigation Case Selection
-
-The system identifies high-priority cases using KPI and business signals prepared by the PostgreSQL analytics layer.
-
-Cases are prioritized based on the severity of revenue movement, inventory movement, and reorder-level conditions.
-
----
-
-## 2. Historical Analysis
-
-For the selected region and product category, historical data is retrieved and compared with the investigation period.
-
-This establishes how unusual the current behavior is relative to previous periods.
-
----
-
-## 3. Statistical Analysis
-
-The system calculates Z-scores and KPI deviations to quantify unusual behavior.
-
-These measurements provide the statistical foundation for the investigation.
-
----
-
-## 4. Hybrid Assessment
-
-Historical behavior, statistical results, and business context are combined to determine the dominant signal and overall investigation strength.
-
----
-
-## 5. Evidence Construction
-
-The investigation results are converted into structured evidence.
-
-The LLM receives this structured evidence rather than raw database information, reducing unsupported interpretation.
-
----
-
-## 6. Hypothesis Generation
-
-The structured evidence is passed to an LLM to generate possible explanations.
-
-The model is instructed to:
-
-- Use only supplied evidence.
-- Avoid unsupported causes.
-- Avoid treating correlation as confirmed causation.
-- Separate known information from unknowns.
-- Prefer stronger explanations over speculative ones.
-
----
-
-## 7. Hypothesis Analysis
-
-Generated hypotheses are analyzed for:
+The generated hypothesis is analyzed to identify:
 
 - Business signals
-- Relationship type
-- Claim type
-- Direction
 - Causal language
-- Uncertainty or hedging language
+- Uncertainty
+- Investigation language
+- Relationships between signals
+- Claim types
+- Direction of the hypothesis
 
-This stage describes the hypothesis rather than determining whether it is true.
+The NLP layer interprets the hypothesis; it does not independently determine whether the hypothesis is true.
 
----
+### Confidence
 
-## 8. Confidence Scoring
+The confidence section communicates how strongly the available evidence supports the investigation.
 
-The investigation evaluates supporting and weakening evidence to calculate:
 
-- Supporting evidence score
-- Weakening evidence score
-- Confidence score
-- Confidence level
+## Recommendations
 
----
+The final section presents the recommended next investigation step based on the available evidence.
 
-## 9. Recommendation
 
-The investigation is translated into an operational recommendation containing:
 
-- Investigation priority
-- Signal strength
-- Dominant signal
-- Supporting reasons
-- Recommended next steps
-- Causal warning where appropriate
+# Architecture
 
----
-
-# Dataset & Experimental Setup
-
-The project uses the **Brazilian Olist e-commerce dataset** as its primary business dataset.
-
-The dataset contains information about:
-
-- Customers
-- Orders
-- Order items
-- Products
-- Sellers
-- Payments
-- Reviews
-- Geolocation
-- Product categories
-
-An additional synthetic inventory dataset is used to introduce inventory context that is not available in the original Olist dataset:
-
-`Data/synthetic/inventory_context.csv`
-
-This provides inventory information such as stock levels, reorder levels, and inventory movement for the investigation experiment.
-
-The data is loaded into PostgreSQL and combined through analytical views for KPI, revenue, inventory, and business-signal analysis.
-
----
+The application consists of a React and TypeScript frontend connected to a FastAPI backend. The backend coordinates the investigation engine, PostgreSQL data layer, statistical analysis, recommendation logic, NLP processing, and Groq-based LLM hypothesis generation.
 
 # Technology Stack
 
-| Layer | Technology |
-|---|---|
-| Language | Python |
-| Database | PostgreSQL |
-| Analytics | SQL / PostgreSQL Views |
-| Backend | FastAPI |
-| Database Connectivity | SQLAlchemy |
-| AI | Groq API / LLM |
-| NLP | Python |
-| Frontend | React |
-| Frontend Language | TypeScript |
-| Build Tool | Vite |
-| Visualization | Recharts |
-| Data Processing | Pandas |
-| Version Control | Git / GitHub |
+## Backend
+
+- Python
+- FastAPI
+- SQLAlchemy
+- PostgreSQL
+- Pydantic
+- psycopg2
+
+## AI / NLP
+
+- Groq
+- LLM-based hypothesis generation
+- NLP-based hypothesis interpretation
+- Evidence-grounded prompting
+
+## Frontend
+
+- React
+- TypeScript
+- CSS
+- KPI visualization
+- Investigation workflow UI
 
 ---
 
-# PostgreSQL & SQL Analytics
+# Data Architecture
 
-PostgreSQL acts as the primary data and analytics layer.
+The platform uses the Olist-based business dataset.
 
-### Main Tables
+Core business tables include:
 
 - `orders`
 - `order_items`
 - `customers`
 - `products`
+- `reviews`
+- `payments`
 - `sellers`
-- `inventory_context`
 
-### Analytics Pipeline
+Supporting tables include:
 
-**Raw Data → Analytics Views → KPI Calculation → Revenue & Inventory Analysis → Business Signals → Investigation Queue**
+- `geolocation`
+- `product_category_translation`
 
-### Important Analytics Views
-
-- `analytics_order_items`
-- `analytics_monthly_kpi`
-- `analytics_revenue_anomaly`
-- `analytics_revenue_region_category`
-- `analytics_revenue_driver`
-- `analytics_inventory_kpi`
-- `analytics_business_signal`
-- `analytics_investigation_queue`
-
-The analytics layer calculates revenue performance, historical expectations, revenue deviations, inventory movement, reorder conditions, and investigation priority.
+The project also uses inventory and KPI investigation context for the analytical pipeline.
 
 ---
 
-# Python Backend
+# Project Structure
 
-The Python backend performs the deeper investigation after PostgreSQL prepares the prioritized cases.
-
-## `database.py`
-
-Handles the PostgreSQL connection.
-
-It:
-
-- Loads database configuration from `.env`.
-- Builds the database connection.
-- Creates the SQLAlchemy engine used by the backend.
-
-## `investigation.py`
-
-Orchestrates the complete investigation pipeline:
-
-- Case selection
-- Historical analysis
-- Statistical analysis
-- Evidence construction
-- Hypothesis evaluation
-- Confidence scoring
-- Recommendation generation
-- Executive summary generation
-
-## `llm.py`
-
-Handles LLM-assisted hypothesis generation through the Groq API.
-
-The LLM receives structured evidence and is constrained to avoid unsupported explanations and unverified causal claims.
-
-The system also includes deterministic fallback behavior when the LLM service is unavailable.
-
-## `nlp.py`
-
-Analyzes generated hypotheses for:
-
-- Business signals
-- Relationship type
-- Claim type
-- Direction
-- Causal language
-- Uncertainty
-
-The extracted characteristics contribute to the investigation and confidence logic.
-
----
-
-# React Frontend
-
-The frontend is built using:
-
-- React
-- TypeScript
-- Vite
-- Recharts
-
-The dashboard consumes the FastAPI investigation response dynamically.
-
-The frontend presents:
-
-- Investigation overview
-- KPI snapshot
-- Investigation outcome
-- Investigation flow
-- Historical performance trajectory
-- Statistical evidence
-- AI hypothesis
-- Confidence assessment
-- Recommended action
-- Executive business summary
-
-The interface is designed to keep **evidence, interpretation, uncertainty, and action clearly separated**.
+```text
+Kpi_intelligence_engine/
+│
+├── Backend/
+│   ├── analytics.py
+│   ├── api.py
+│   ├── database.py
+│   ├── investigation.py
+│   ├── llm.py
+│   ├── nlp.py
+│   └── recommendation.py
+│
+├── frontend/
+│   └── src/
+│       ├── App.tsx
+│       └── App.css
+│
+├── .env
+├── requirements.txt
+└── README.md
+```
 
 ---
 
 # API
 
-The backend exposes the investigation through FastAPI.
+The backend exposes the investigation service through FastAPI.
 
-## `GET /investigation`
+### Health / Root
 
-Returns the complete investigation result:
-
-```json
-{
-  "case": {},
-  "history": [],
-  "priority": {},
-  "key_metrics": {},
-  "signals": {},
-  "hypothesis": {},
-  "confidence": {},
-  "recommendation": {},
-  "business_summary": {}
-}
-
+```http
+GET /
 ```
----
-# Running the Project
 
-## Backend
+### Investigation
 
-Activate the virtual environment and start the FastAPI server:
-
-```bash
-uvicorn Backend.api:app --reload --port 8001
+```http
+GET /investigation
 ```
-The investigation API will be available at:
+
+The investigation endpoint returns information required by the dashboard, including:
 
 ```text
-http://127.0.0.1:8001/investigation
+Case
+History
+Priority
+Key Metrics
+Signals
+Hypothesis
+Confidence
+Recommendation
+Business Summary
 ```
 
-## Frontend
+---
 
-Navigate to the frontend directory and install the dependencies:
+# Environment Configuration
+
+Create a `.env` file and configure the required credentials:
+
+```env
+DB_USER=your_database_user
+DB_PASSWORD=your_database_password
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=your_database_name
+
+GROQ_API_KEY=your_groq_api_key
+```
+
+Do not commit real credentials or API keys to GitHub.
+
+---
+
+# Installation
+
+## 1. Clone the repository
+
+```bash
+git clone https://github.com/Sahil251005/Kpi_intelligence_engine.git
+cd Kpi_intelligence_engine
+```
+
+## 2. Create a Python environment
+
+```bash
+python -m venv venv
+```
+
+Activate it on Windows:
+
+```bash
+venv\Scripts\activate
+```
+
+## 3. Install backend dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+## 4. Configure PostgreSQL
+
+Create and configure the required PostgreSQL database and load the project data.
+
+Then configure the database credentials in `.env`.
+
+---
+
+# Running the Backend
+
+Start the FastAPI server:
+
+```bash
+uvicorn Backend.api:app --host 0.0.0.0 --port 8001
+```
+
+The API will then be available on port `8001`.
+
+---
+
+# Running the Frontend
+
+Navigate to the frontend:
 
 ```bash
 cd frontend
+```
+
+Install dependencies:
+
+```bash
 npm install
+```
+
+Run the development server:
+
+```bash
 npm run dev
 ```
 
-The Vite development server will provide the dashboard locally.
+The frontend communicates with the FastAPI investigation endpoint.
 
 ---
 
-### Team Commit & Conquer
+# Example Investigation
 
-* [Kanishka Sakunia](https://github.com/kanishka5268)
-* [Chiranjeev Kalyane](https://github.com/CJK2710Sec)
-* [Sahil Sutar](https://github.com/Sahil251005)
+A typical investigation can contain a context such as:
 
+```text
+Region:
+SP
 
+Category:
+cama_mesa_banho
+
+Warehouse:
+SP-Warehouse-1
+
+Period:
+July 2018
+```
+
+### Revenue Signal
+
+```text
+Actual Revenue:    27,106.04
+Expected Revenue:  36,306.10
+Deviation:         -25.34%
+```
+
+### Inventory Signal
+
+```text
+Stock:             480
+Reorder Threshold: 300
+Stock Change:      -56.68%
+
+Status:
+RAPID_STOCK_DECLINE
+```
+
+### Business Signal
+
+```text
+HIGH_PRIORITY_SIGNAL
+```
+
+The combined signals produce a high-priority investigation rather than simply displaying the revenue decline as an isolated KPI.
+
+---
+
+# Design Principles
+
+## 1. Evidence Before Explanation
+
+The system does not ask the LLM to directly explain a KPI.
+
+Instead:
+
+```text
+Data
+ ↓
+Analysis
+ ↓
+Evidence
+ ↓
+Hypothesis
+```
+
+---
+
+## 2. Hypotheses Are Not Facts
+
+AI-generated explanations are treated as hypotheses.
+
+The system preserves uncertainty where the available data cannot establish causality.
+
+---
+
+## 3. No Unsupported Causality
+
+The system avoids statements such as:
+
+> "Supplier delays caused the revenue decline."
+
+unless the available data supports that conclusion.
+
+Instead, the system can identify that observed evidence may be consistent with a particular explanation and specify what remains unknown.
+
+---
+
+## 4. Statistical + Business Reasoning
+
+A KPI should not be considered important simply because its value changed.
+
+The engine combines:
+
+```text
+Statistical Evidence
+        +
+Business Evidence
+        +
+Historical Context
+        ↓
+Investigation Priority
+```
+
+---
+
+## 5. Actionable Investigation
+
+The final output should help the user determine:
+
+> **What should I investigate next?**
+
+rather than only providing another dashboard metric.
+
+---
+
+# Why This Approach Matters
+
+Traditional analytics often follows:
+
+```text
+Data → Dashboard → Human Interpretation
+```
+
+KPI Intelligence Engine extends this to:
+
+```text
+Data
+ ↓
+KPI Signal
+ ↓
+Historical Context
+ ↓
+Statistical Analysis
+ ↓
+Evidence
+ ↓
+AI Hypothesis
+ ↓
+Confidence
+ ↓
+Recommended Investigation
+```
+
+This creates a bridge between business intelligence and AI-assisted investigation.
+
+---
+
+# Future Enhancements
+
+Potential future improvements include:
+
+- More KPI categories
+- Additional operational signals
+- Automated root-cause investigation
+- More granular warehouse analysis
+- Supplier-level evidence
+- Customer behavior signals
+- Automated anomaly monitoring
+- More sophisticated causal analysis
+- Investigation history and case tracking
+- More role-specific dashboards
+- Real-time KPI monitoring
+
+---
+
+# Conclusion
+
+**KPI Intelligence Engine** transforms KPI monitoring from a passive reporting experience into an evidence-driven investigation system.
+
+Instead of stopping at:
+
+> **"Revenue is down."**
+
+the platform attempts to answer:
+
+> **"How unusual is the decline, what evidence supports it, what could explain the behavior, how confident are we, and what should the business investigate next?"**
+
+By combining historical analysis, statistical reasoning, business signals, evidence construction, LLM-powered hypotheses, NLP interpretation, confidence scoring, and actionable recommendations, the system provides a structured path from:
+
+### **Metrics → Evidence → Meaning → Action**
